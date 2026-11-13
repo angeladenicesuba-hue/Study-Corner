@@ -1,0 +1,11 @@
+﻿Date,Time,Receipt_No,Staff,Customer,Member,Minutes_Stayed,Category,Item,Qty,Unit_Price_PHP,Line_Amount_PHP,Sale_Discount_PHP,Sale_Total_PHP,Payment_Methods
+2026-11-11,23:07:53,SC-20261111-00001,Front Desk,Ma. Angela Denice M. Suba,NO,2,TIME,Study Time - 1-2 hours (Non-Member),1,80,80,0,80,CASH:80
+2026-11-11,23:15:38,SC-20261111-00002,Front Desk,Mark aaron teves,YES,8,TIME,Study Time - 1-2 hours (Member),1,70,70,0,70,QRPH:70(QRPH)
+2026-11-11,23:21:13,SC-20261111-00003,Front Desk,Walk-in Customer,NO,0,FOOD,Spanish Latte,2,95,190,0,190,CASH:190
+2026-11-13,21:37:50,SC-20261113-00004,Front Desk,Juan Dela Cruz,YES,2906,TIME,Study Time - 11-13 hours (Member),1,210,210,0,474,CASH:474
+2026-11-13,21:37:50,SC-20261113-00004,Front Desk,Juan Dela Cruz,YES,2906,FOOD,Spanish Latte,1,95,95,0,474,CASH:474
+2026-11-13,21:37:50,SC-20261113-00004,Front Desk,Juan Dela Cruz,YES,2906,FOOD,Beef Bulgogi,1,169,169,0,474,CASH:474
+2026-11-13,21:37:59,SC-20261113-00005,Front Desk,Angela Reyes,NO,2821,TIME,Study Time - 11-13 hours (Non-Member),1,230,230,0,230,CASH:230
+2026-11-13,21:37:59,SC-20261113-00006,Front Desk,Angela Reyes,NO,2821,TIME,Study Time - 11-13 hours (Non-Member),1,230,230,0,230,CASH:230
+2026-11-13,22:20:25,SC-20261113-00007,Front Desk,Ma. Angela Denice M. suba,NO,1,TIME,Study Time - 1-2 hours (Non-Member),1,80,80,0,80,CASH:80
+2026-11-13,22:20:46,SC-20261113-00008,Front Desk,Ma. Angela Denice M. suba,NO,1,TIME,Study Time - 1-2 hours (Non-Member),1,80,80,0,80,CASH:80

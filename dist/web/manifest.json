@@ -1,0 +1,11 @@
+{
+  "name": "Study Corner MNL — Offline POS & Ledger",
+  "short_name": "Study Corner POS",
+  "description": "Offline-First POS, Study Hub Timer, Food Ordering & Financial Ledger with LocalStorage + SQLite Sync",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "any"
+}

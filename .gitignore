@@ -1,0 +1,5 @@
+node_modules/
+StudyCorner_Data/*.sqlite-shm
+StudyCorner_Data/*.sqlite-wal
+.DS_Store
+*.log
