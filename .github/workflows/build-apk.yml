@@ -45,6 +45,7 @@ jobs:
         run: |
           if [ ! -d "src-tauri" ]; then
             npx tauri init --ci --app-name "Study Corner POS" --window-title "Study Corner POS" --frontend-dist "../dist/web" --dev-url "http://localhost:5173" --before-dev-command "npm run dev" --before-build-command "npm run build"
+            sed -i 's/"com.tauri.dev"/"com.studycorner.pos"/g' src-tauri/tauri.conf.json
           fi
           if [ ! -d "src-tauri/gen/android" ]; then
             npx tauri android init --ci
@@ -58,3 +59,4 @@ jobs:
         with:
           name: Study-Corner-POS-APK
           path: src-tauri/gen/android/app/build/outputs/apk/universal/debug/*.apk
+
