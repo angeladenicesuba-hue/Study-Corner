@@ -29,17 +29,23 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Configure pre-installed Android SDK & NDK
+      - name: Configure compatible Android NDK (v26/v27)
         run: |
-          NDK_PATH=$(ls -d $ANDROID_HOME/ndk/* | sort -V | tail -n 1)
+          echo "Available NDKs:"
+          ls -d $ANDROID_HOME/ndk/*
+          NDK_PATH=$(ls -d $ANDROID_HOME/ndk/27.* $ANDROID_HOME/ndk/26.* 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$NDK_PATH" ]; then
+            yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;27.2.12479018"
+            NDK_PATH="$ANDROID_HOME/ndk/27.2.12479018"
+          fi
           echo "ANDROID_NDK_ROOT=$NDK_PATH" >> $GITHUB_ENV
           echo "NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
           echo "Using NDK at: $NDK_PATH"
 
-      - name: Install Rust and Android targets
+      - name: Install Rust and Android ARM64 target
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+          targets: aarch64-linux-android
 
       - name: Initialize Tauri Rust & Android Architecture
         run: |
@@ -52,11 +58,10 @@ jobs:
           fi
 
       - name: Build Debug APK
-        run: npx tauri android build --apk --debug
+        run: npx tauri android build --apk --debug --target aarch64
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Study-Corner-POS-APK
           path: src-tauri/gen/android/app/build/outputs/apk/universal/debug/*.apk
-
