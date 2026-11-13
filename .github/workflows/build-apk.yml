@@ -23,6 +23,14 @@ jobs:
           npm install
           npm install -D @tauri-apps/cli@latest
 
+      - name: Build Web Frontend (if needed)
+        run: |
+          if [ ! -d "dist/web" ]; then
+            npm run build
+          else
+            echo "Using existing dist/web folder"
+          fi
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -31,8 +39,6 @@ jobs:
 
       - name: Configure compatible Android NDK (v26/v27)
         run: |
-          echo "Available NDKs:"
-          ls -d $ANDROID_HOME/ndk/*
           NDK_PATH=$(ls -d $ANDROID_HOME/ndk/27.* $ANDROID_HOME/ndk/26.* 2>/dev/null | sort -V | tail -n 1)
           if [ -z "$NDK_PATH" ]; then
             yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;27.2.12479018"
@@ -40,7 +46,6 @@ jobs:
           fi
           echo "ANDROID_NDK_ROOT=$NDK_PATH" >> $GITHUB_ENV
           echo "NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
-          echo "Using NDK at: $NDK_PATH"
 
       - name: Install Rust and Android ARM64 target
         uses: dtolnay/rust-toolchain@stable
@@ -50,7 +55,7 @@ jobs:
       - name: Initialize Tauri Rust & Android Architecture
         run: |
           if [ ! -d "src-tauri" ]; then
-            npx tauri init --ci --app-name "Study Corner POS" --window-title "Study Corner POS" --frontend-dist "../dist/web" --dev-url "http://localhost:5173" --before-dev-command "npm run dev" --before-build-command "npm run build"
+            npx tauri init --ci --app-name "Study Corner POS" --window-title "Study Corner POS" --frontend-dist "../dist/web" --dev-url "http://localhost:5173" --before-dev-command "" --before-build-command ""
             sed -i 's/"com.tauri.dev"/"com.studycorner.pos"/g' src-tauri/tauri.conf.json
           fi
           if [ ! -d "src-tauri/gen/android" ]; then
@@ -65,3 +70,4 @@ jobs:
         with:
           name: Study-Corner-POS-APK
           path: src-tauri/gen/android/app/build/outputs/apk/universal/debug/*.apk
+
