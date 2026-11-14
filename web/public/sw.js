@@ -1,4 +1,4 @@
-const CACHE_NAME = 'study-corner-pos-cache-v1';
+const CACHE_NAME = 'study-corner-pos-cache-v2';
 const APP_SHELL = ['/', '/index.html', '/manifest.json', '/logo.png'];
 
 self.addEventListener('install', (event) => {
@@ -34,6 +34,7 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
 
   // Skip API endpoints and SSE streams — handled by hybrid api.ts + localStorage
   if (url.pathname.startsWith('/api/')) {
@@ -45,13 +46,21 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(req)
         .then((res) => {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', clone));
+          if (res && res.status === 200) {
+            const clone = res.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', clone));
+          }
           return res;
         })
         .catch(async () => {
-          const cached = await caches.match('/index.html');
-          return cached || caches.match('/');
+          const cached = (await caches.match('/index.html')) || (await caches.match('/'));
+          return (
+            cached ||
+            new Response('Offline — Study Corner POS is unavailable until cached.', {
+              status: 503,
+              headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+            })
+          );
         })
     );
     return;
@@ -68,7 +77,7 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         })
-        .catch(() => cachedResponse);
+        .catch(() => cachedResponse || Response.error());
 
       return cachedResponse || fetchPromise;
     })

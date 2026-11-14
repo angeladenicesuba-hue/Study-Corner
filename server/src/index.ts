@@ -65,7 +65,13 @@ async function readBody(req: http.IncomingMessage): Promise<any> {
   });
 }
 
-function serveStaticFile(res: http.ServerResponse, filePath: string) {
+function isPathInside(baseDir: string, targetPath: string): boolean {
+  const resolvedBase = path.resolve(baseDir);
+  const resolvedTarget = path.resolve(targetPath);
+  return resolvedTarget === resolvedBase || resolvedTarget.startsWith(resolvedBase + path.sep);
+}
+
+function serveStaticFile(res: http.ServerResponse, filePath: string, reqPathname?: string) {
   if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
     return false;
   }
@@ -83,8 +89,16 @@ function serveStaticFile(res: http.ServerResponse, filePath: string) {
     '.csv': 'text/csv; charset=utf-8',
     '.sqlite': 'application/octet-stream',
   };
+  const baseName = path.basename(filePath);
+  let cacheControl = 'public, max-age=3600';
+  if (baseName === 'index.html' || baseName === 'sw.js' || baseName === 'manifest.json') {
+    cacheControl = 'no-cache';
+  } else if (reqPathname?.startsWith('/assets/')) {
+    cacheControl = 'public, max-age=31536000, immutable';
+  }
   res.writeHead(200, {
     'Content-Type': mimeMap[ext] || 'application/octet-stream',
+    'Cache-Control': cacheControl,
     'Access-Control-Allow-Origin': '*',
   });
   fs.createReadStream(filePath).pipe(res);
@@ -125,9 +139,8 @@ const server = http.createServer(async (req, res) => {
     // 3. Download CSV files directly
     if (pathname.startsWith('/api/csv/download/')) {
       const rel = pathname.replace('/api/csv/download/', '');
-      const safeRel = path.normalize(rel).replace(/^(\.\.(\/|\\|$))+/, '');
-      const fullPath = path.join(DATA_DIR, safeRel);
-      if (fs.existsSync(fullPath) && fullPath.endsWith('.csv')) {
+      const fullPath = path.resolve(DATA_DIR, rel);
+      if (isPathInside(DATA_DIR, fullPath) && fs.existsSync(fullPath) && fullPath.endsWith('.csv')) {
         res.writeHead(200, {
           'Content-Type': 'text/csv; charset=utf-8',
           'Content-Disposition': `attachment; filename="${path.basename(fullPath)}"`,
@@ -155,6 +168,14 @@ const server = http.createServer(async (req, res) => {
     }
 
     // --- API ROUTES ---
+    if (pathname === '/api/health' && req.method === 'GET') {
+      return sendJson(res, 200, {
+        ok: true,
+        service: 'study-corner-pos',
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     if (pathname === '/api/bootstrap' && req.method === 'GET') {
       const settings = getSettings(db);
       return sendJson(res, 200, {
@@ -297,9 +318,10 @@ const server = http.createServer(async (req, res) => {
     // Serve built frontend in production
     const webDist = path.resolve(process.cwd(), 'dist', 'web');
     if (fs.existsSync(webDist)) {
-      const candidate = path.join(webDist, pathname === '/' ? 'index.html' : pathname);
-      if (serveStaticFile(res, candidate)) return;
-      if (serveStaticFile(res, path.join(webDist, 'index.html'))) return;
+      const relPath = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
+      const candidate = path.resolve(webDist, relPath);
+      if (isPathInside(webDist, candidate) && serveStaticFile(res, candidate, pathname)) return;
+      if (serveStaticFile(res, path.join(webDist, 'index.html'), '/index.html')) return;
     }
 
     return sendJson(res, 404, { error: `Route not found: ${pathname}` });
@@ -308,6 +330,8 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 400, { error: err?.message || 'Unexpected error' });
   }
 });
+
+const webDistDir = path.resolve(process.cwd(), 'dist', 'web');
 
 server.listen(PORT, '0.0.0.0', () => {
   const ips = getLocalLanIps();
@@ -318,5 +342,30 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`  Tablet/Phone:   http://${ip}:${PORT}`);
   }
   console.log(`  CSV & Backups:  ${DATA_DIR}`);
+  if (!fs.existsSync(path.join(webDistDir, 'index.html'))) {
+    console.warn(`  [WARN] dist/web not found. Run "npm run build" before serving in production.`);
+  }
   console.log(`========================================================\n`);
 });
+
+function shutdown() {
+  for (const client of sseClients) {
+    try {
+      client.end();
+    } catch {
+      // ignore
+    }
+  }
+  sseClients.clear();
+  server.close(() => {
+    try {
+      db.close();
+    } catch {
+      // ignore
+    }
+    process.exit(0);
+  });
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
