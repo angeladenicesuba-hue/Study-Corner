@@ -12,6 +12,10 @@
     @apply bg-slate-50 text-slate-900 antialiased selection:bg-blue-600 selection:text-white;
   }
 
+  html.dark body {
+    @apply bg-slate-950 text-slate-100;
+  }
+
   input,
   select,
   button,
@@ -38,6 +42,58 @@
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+/* Global Dark Mode surface, border, and text harmonization */
+html.dark .bg-white {
+  background-color: #0f172a !important;
+}
+html.dark .bg-slate-50 {
+  background-color: #020617 !important;
+}
+html.dark .bg-slate-100 {
+  background-color: #1e293b !important;
+}
+html.dark .border-slate-200,
+html.dark .border-slate-300,
+html.dark .border-slate-100 {
+  border-color: #334155 !important;
+}
+html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #1e293b !important;
+}
+html.dark .text-slate-900 {
+  color: #f8fafc !important;
+}
+html.dark .text-slate-800 {
+  color: #e2e8f0 !important;
+}
+html.dark .text-slate-700 {
+  color: #cbd5e1 !important;
+}
+html.dark .text-slate-600,
+html.dark .text-slate-500 {
+  color: #94a3b8 !important;
+}
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #0f172a;
+  color: #f8fafc;
+  border-color: #334155;
+}
+html.dark .hover\:bg-slate-50:hover,
+html.dark .hover\:bg-slate-100:hover {
+  background-color: #1e293b !important;
+}
+
+/* Keep printable receipts high-contrast black-on-white */
+html.dark #printable-receipt,
+html.dark #printable-receipt * {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
 }
 
 @media print {

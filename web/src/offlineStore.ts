@@ -785,15 +785,16 @@ function csvEscape(val: unknown): string {
   return str;
 }
 
-export function generateOfflineCsvContent(type: 'sales' | 'payments' | 'expenses', periodPrefix?: string): string {
-  const state = loadOfflineState();
-  const prefix = periodPrefix || new Date().toISOString().slice(0, 7);
-
+export function buildCsvFromRecords(
+  type: 'sales' | 'payments' | 'expenses',
+  sales: SaleRecord[],
+  expenses: ExpenseRecord[]
+): string {
   if (type === 'sales') {
     const rows = [
       ['ReceiptNo', 'CreatedAt', 'Staff', 'Customer', 'IsMember', 'MinutesStayed', 'Subtotal', 'Discount', 'Total', 'Items'].join(','),
     ];
-    for (const s of state.sales.filter((x) => x.createdAt.startsWith(prefix))) {
+    for (const s of sales) {
       const itemsText = s.lines.map((l) => `${l.qty}x ${l.item} (${l.amount})`).join('; ');
       rows.push(
         [
@@ -817,7 +818,7 @@ export function generateOfflineCsvContent(type: 'sales' | 'payments' | 'expenses
 
   if (type === 'payments') {
     const rows = [['ReceiptNo', 'CreatedAt', 'Customer', 'Method', 'Amount', 'Tendered', 'RefNo'].join(',')];
-    for (const s of state.sales.filter((x) => x.createdAt.startsWith(prefix))) {
+    for (const s of sales) {
       for (const p of s.payments) {
         rows.push(
           [
@@ -838,23 +839,47 @@ export function generateOfflineCsvContent(type: 'sales' | 'payments' | 'expenses
   }
 
   const rows = [['Id', 'CreatedAt', 'Category', 'Amount', 'Method', 'Note', 'Staff'].join(',')];
-  for (const e of state.expenses.filter((x) => x.createdAt.startsWith(prefix))) {
+  for (const e of expenses) {
     rows.push([e.id, e.createdAt, e.category, e.amount, e.method, e.note, e.staffName].map(csvEscape).join(','));
   }
   return rows.join('\n');
 }
 
+export function generateOfflineCsvContent(type: 'sales' | 'payments' | 'expenses', periodPrefix?: string): string {
+  const state = loadOfflineState();
+  const prefix = periodPrefix || new Date().toISOString().slice(0, 7);
+  const filteredSales = state.sales.filter((x) => x.createdAt.startsWith(prefix));
+  const filteredExpenses = state.expenses.filter((x) => x.createdAt.startsWith(prefix));
+  return buildCsvFromRecords(type, filteredSales, filteredExpenses);
+}
+
 export function downloadTextFile(filename: string, content: string, mimeType = 'text/csv;charset=utf-8;'): void {
   if (typeof document === 'undefined') return;
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
+  const payload = mimeType.includes('text/csv') && !content.startsWith('\uFEFF') ? `\uFEFF${content}` : content;
   const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  a.style.display = 'none';
+
+  try {
+    const blob = new Blob([payload], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 3000);
+  } catch {
+    const dataUrl = `data:${mimeType},${encodeURIComponent(payload)}`;
+    a.href = dataUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+    }, 1000);
+  }
 }
 
 export function downloadOfflineStateBackup(): string {

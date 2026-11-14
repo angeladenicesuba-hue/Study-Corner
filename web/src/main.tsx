@@ -2,7 +2,10 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { applyUiPreferences, loadUiPreferences } from './uiPrefs';
 import './index.css';
+
+applyUiPreferences(loadUiPreferences());
 
 // Register Service Worker for offline asset caching
 if ('serviceWorker' in navigator) {

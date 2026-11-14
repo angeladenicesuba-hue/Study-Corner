@@ -1,13 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   PlusCircle,
   Download,
   Lock,
   Unlock,
   ChevronDown,
+  Copy,
+  Share2,
+  X,
 } from 'lucide-react';
 import { formatPeso } from '@shared/billing';
 import { api, LedgerResponse } from '../api';
+import { buildCsvFromRecords, downloadTextFile, generateOfflineCsvContent } from '../offlineStore';
 
 interface LedgerViewProps {
   staffName: string;
@@ -30,6 +34,11 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ staffName }) => {
   const [openingCash, setOpeningCash] = useState<string>('1000');
   const [countedCash, setCountedCash] = useState<string>('');
   const [shiftBanner, setShiftBanner] = useState<string>('');
+
+  // CSV export state & fallback
+  const exportMenuRef = useRef<HTMLDetailsElement>(null);
+  const [csvExport, setCsvExport] = useState<{ filename: string; content: string; copied?: boolean } | null>(null);
+  const [showCsvPreview, setShowCsvPreview] = useState<boolean>(false);
 
   const loadLedger = async (targetPeriod = period) => {
     setLoading(true);
@@ -82,6 +91,47 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ staffName }) => {
 
   const todayYmd = new Date().toISOString().slice(0, 10);
   const currentMonthYm = todayYmd.slice(0, 7);
+
+  const handleExportCsv = (type: 'sales' | 'payments' | 'expenses') => {
+    const filename = `${type}_${period || currentMonthYm}.csv`;
+    const content = data
+      ? buildCsvFromRecords(type, data.sales, data.expenses)
+      : generateOfflineCsvContent(type, period.slice(0, 7));
+
+    downloadTextFile(filename, content);
+    setCsvExport({ filename, content, copied: false });
+    if (exportMenuRef.current) {
+      exportMenuRef.current.open = false;
+    }
+  };
+
+  const handleCopyCsv = async () => {
+    if (!csvExport) return;
+    try {
+      await navigator.clipboard.writeText(csvExport.content);
+      setCsvExport({ ...csvExport, copied: true });
+    } catch {
+      setShowCsvPreview(true);
+    }
+  };
+
+  const handleShareCsv = async () => {
+    if (!csvExport) return;
+    try {
+      if (navigator.share) {
+        const file = new File([csvExport.content], csvExport.filename, { type: 'text/csv' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: csvExport.filename });
+          return;
+        }
+        await navigator.share({ title: csvExport.filename, text: csvExport.content });
+        return;
+      }
+    } catch {
+      // User cancelled or share unsupported
+    }
+    setShowCsvPreview(true);
+  };
 
   return (
     <div className="space-y-5">
@@ -156,37 +206,37 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ staffName }) => {
           </button>
 
           {/* Compact CSV Export Dropdown */}
-          <details className="relative group">
+          <details ref={exportMenuRef} className="relative group">
             <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-800 hover:bg-slate-50">
               <Download className="h-3.5 w-3.5 text-emerald-700" />
               <span>Export CSV</span>
               <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
             </summary>
-            <div className="absolute right-0 z-20 mt-1.5 w-52 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg divide-y divide-slate-100 text-xs">
+            <div className="absolute right-0 z-20 mt-1.5 w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg divide-y divide-slate-100 text-xs">
               <div className="pb-1">
                 <button
                   type="button"
-                  onClick={() => api.downloadLocalCsv('sales', period.slice(0, 7))}
+                  onClick={() => handleExportCsv('sales')}
                   className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left font-semibold text-slate-800 hover:bg-slate-50"
                 >
                   <span>Sales CSV</span>
-                  <span className="text-slate-500 tabular-nums">{period.slice(0, 7)}</span>
+                  <span className="text-slate-500 tabular-nums">{period}</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => api.downloadLocalCsv('payments', period.slice(0, 7))}
+                  onClick={() => handleExportCsv('payments')}
                   className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left font-semibold text-slate-800 hover:bg-slate-50"
                 >
                   <span>Payments CSV</span>
-                  <span className="text-slate-500 tabular-nums">{period.slice(0, 7)}</span>
+                  <span className="text-slate-500 tabular-nums">{period}</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => api.downloadLocalCsv('expenses', period.slice(0, 7))}
+                  onClick={() => handleExportCsv('expenses')}
                   className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left font-semibold text-slate-800 hover:bg-slate-50"
                 >
                   <span>Expenses CSV</span>
-                  <span className="text-slate-500 tabular-nums">{period.slice(0, 7)}</span>
+                  <span className="text-slate-500 tabular-nums">{period}</span>
                 </button>
               </div>
               {data && data.csvFiles.length > 0 && (
@@ -195,7 +245,7 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ staffName }) => {
                     <a
                       key={f.relativePath}
                       href={`/api/csv/download/${f.relativePath}`}
-                      download
+                      download={f.name}
                       className="block truncate rounded-lg px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50"
                     >
                       Hub: {f.name}
@@ -207,6 +257,60 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ staffName }) => {
           </details>
         </div>
       </div>
+
+      {/* CSV Export Confirmation & WebView Fallback Bar */}
+      {csvExport && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs text-emerald-950">
+          <div className="font-semibold">
+            Prepared <span className="font-bold">{csvExport.filename}</span> ({csvExport.content.split('\n').length - 1} row(s)).
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => downloadTextFile(csvExport.filename, csvExport.content)}
+              className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-white px-2.5 py-1 font-semibold text-emerald-900 hover:bg-emerald-100"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Save Again
+            </button>
+            <button
+              type="button"
+              onClick={handleCopyCsv}
+              className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-white px-2.5 py-1 font-semibold text-emerald-900 hover:bg-emerald-100"
+            >
+              <Copy className="h-3.5 w-3.5" />
+              {csvExport.copied ? 'Copied!' : 'Copy CSV'}
+            </button>
+            <button
+              type="button"
+              onClick={handleShareCsv}
+              className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-white px-2.5 py-1 font-semibold text-emerald-900 hover:bg-emerald-100"
+            >
+              <Share2 className="h-3.5 w-3.5" />
+              Share / View
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setCsvExport(null);
+                setShowCsvPreview(false);
+              }}
+              aria-label="Dismiss export banner"
+              className="rounded-lg p-1 text-emerald-800 hover:bg-emerald-100"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          {showCsvPreview && (
+            <textarea
+              readOnly
+              value={csvExport.content}
+              rows={6}
+              className="mt-1 w-full rounded-lg border border-emerald-300 bg-white p-2 font-mono text-[11px] text-slate-900"
+            />
+          )}
+        </div>
+      )}
 
       {/* Collapsible Action Drawer: Record Expense */}
       {activePanel === 'expense' && (

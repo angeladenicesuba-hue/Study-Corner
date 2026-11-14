@@ -10,9 +10,21 @@ import {
   DollarSign,
   CheckCircle2,
   MonitorSmartphone,
+  Sun,
+  Moon,
+  Type,
+  HelpCircle,
 } from 'lucide-react';
 import { AppSettings, Product } from '@shared/types';
 import { api } from '../api';
+import {
+  loadUiPreferences,
+  saveUiPreferences,
+  ThemeMode,
+  UI_SCALE_OPTIONS,
+  UiPreferences,
+  UiScale,
+} from '../uiPrefs';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -22,6 +34,7 @@ interface SettingsViewProps {
   dataDir: string;
   onRefresh: () => void;
   onOpenDeviceStudio?: () => void;
+  onOpenTutorial?: () => void;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -39,8 +52,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   dataDir,
   onRefresh,
   onOpenDeviceStudio,
+  onOpenTutorial,
 }) => {
-  const [tab, setTab] = useState<'menu' | 'rates' | 'qr' | 'sync'>('menu');
+  const [tab, setTab] = useState<'menu' | 'rates' | 'qr' | 'sync' | 'appearance'>('menu');
+  const [uiPrefs, setUiPrefs] = useState<UiPreferences>(() => loadUiPreferences());
   const [formSettings, setFormSettings] = useState<AppSettings>(settings);
   const [newProdName, setNewProdName] = useState('');
   const [newProdCategory, setNewProdCategory] = useState<'iced_coffee' | 'non_coffee' | 'lunch_dinner'>('iced_coffee');
@@ -134,6 +149,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const offlineStats = api.getOfflineStats();
 
+  const handleThemeChange = (theme: ThemeMode) => {
+    const next = saveUiPreferences({ ...uiPrefs, theme });
+    setUiPrefs(next);
+    setBanner(`Switched to ${theme === 'dark' ? 'Dark' : 'Light'} Mode.`);
+  };
+
+  const handleScaleChange = (scale: UiScale) => {
+    const next = saveUiPreferences({ ...uiPrefs, scale });
+    setUiPrefs(next);
+    const label = UI_SCALE_OPTIONS.find((o) => o.id === scale)?.percent || '100%';
+    setBanner(`UI & font size set to ${label}.`);
+  };
+
   return (
     <div className="space-y-6">
       {/* Sub-navigation Tabs */}
@@ -194,6 +222,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <Smartphone className="h-3.5 w-3.5" />
             <span>Sync & Backup</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setTab('appearance');
+              setBanner('');
+            }}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold transition ${
+              tab === 'appearance' ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
+            }`}
+          >
+            <Type className="h-3.5 w-3.5" />
+            <span>Appearance</span>
+          </button>
         </div>
       </div>
 
@@ -201,6 +243,94 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="mx-auto max-w-2xl flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-950">
           <CheckCircle2 className="h-4 w-4 text-emerald-700" />
           <span>{banner}</span>
+        </div>
+      )}
+
+      {/* Tab 5: Appearance, Theme & UI Scale */}
+      {tab === 'appearance' && (
+        <div className="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_2px_8px_rgba(15,23,42,0.04)] space-y-6">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">Appearance & Readability</h2>
+            <p className="text-xs text-slate-600">
+              Choose Light or Dark Mode and adjust the UI & font size for your screen. Saved on this device.
+            </p>
+          </div>
+
+          {/* Theme Mode */}
+          <div className="space-y-2.5">
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-500">Color Theme</div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => handleThemeChange('light')}
+                className={`flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold transition ${
+                  uiPrefs.theme === 'light'
+                    ? 'border-blue-600 bg-blue-50 text-blue-900'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <Sun className="h-4 w-4" />
+                <span>Light Mode</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleThemeChange('dark')}
+                className={`flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-bold transition ${
+                  uiPrefs.theme === 'dark'
+                    ? 'border-blue-600 bg-blue-600 text-white'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <Moon className="h-4 w-4" />
+                <span>Dark Mode</span>
+              </button>
+            </div>
+          </div>
+
+          {/* UI & Font Scale */}
+          <div className="space-y-2.5">
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-500">UI & Font Size</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              {UI_SCALE_OPTIONS.map((opt) => {
+                const active = uiPrefs.scale === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => handleScaleChange(opt.id)}
+                    className={`rounded-xl border px-3 py-3 text-center transition ${
+                      active
+                        ? 'border-blue-600 bg-blue-600 text-white'
+                        : 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="text-sm font-bold">{opt.label}</div>
+                    <div className={`text-xs ${active ? 'text-blue-100' : 'text-slate-500'}`}>{opt.percent}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Tutorial Guide Replay */}
+          {onOpenTutorial && (
+            <div className="border-t border-slate-200 pt-5 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-bold text-slate-900">Opening Tutorial Guide</div>
+                <p className="text-xs text-slate-600">
+                  Review the quick step-by-step instructions for Time In, Food POS, Plans, and Ledger.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onOpenTutorial}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-800 hover:bg-slate-100"
+              >
+                <HelpCircle className="h-4 w-4 text-blue-600" />
+                <span>Open Tutorial Guide</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
 

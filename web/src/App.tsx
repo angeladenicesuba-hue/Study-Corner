@@ -7,6 +7,7 @@ import {
   BookOpen,
   Settings,
   AlertTriangle,
+  HelpCircle,
   X,
 } from 'lucide-react';
 import { SaleRecord } from '@shared/types';
@@ -19,6 +20,7 @@ import { PlansView } from './views/PlansView';
 import { LedgerView } from './views/LedgerView';
 import { SettingsView } from './views/SettingsView';
 import { ReceiptModal } from './components/ReceiptModal';
+import { TutorialModal, hasSeenTutorial } from './components/TutorialModal';
 
 type SectionId = 'whos_in' | 'time_in' | 'food' | 'plans' | 'ledger' | 'settings';
 
@@ -38,6 +40,7 @@ export const App: React.FC = () => {
   const [lastSale, setLastSale] = useState<SaleRecord | null>(null);
   const [connected, setConnected] = useState<boolean>(true);
   const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
+  const [showTutorial, setShowTutorial] = useState<boolean>(() => !hasSeenTutorial());
   const [deviceStudio, setDeviceStudio] = useState<boolean>(() => {
     return new URLSearchParams(window.location.search).get('preview') === 'devices';
   });
@@ -201,19 +204,19 @@ export const App: React.FC = () => {
   const closingSoon = isClosingSoon(new Date(), data.settings.closeHour);
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-24 lg:pb-12">
+    <div className="min-h-screen bg-slate-50 pb-28 lg:pb-12">
       {/* Clean, Calm Top Bar */}
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-2.5">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3.5">
           {/* Brand & Sync Status */}
           <div className="flex items-center gap-3">
             <img
               src="/logo.png"
               alt="Study Corner Logo"
-              className="h-8 w-8 shrink-0 rounded-lg border border-slate-200 bg-white object-contain p-0.5"
+              className="h-10 w-10 shrink-0 rounded-xl border border-slate-200 bg-white object-contain p-0.5"
             />
             <div className="flex items-center gap-2.5">
-              <span className="text-base font-bold tracking-tight text-slate-900">
+              <span className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">
                 {data.settings.shopName}
               </span>
               <span
@@ -222,10 +225,10 @@ export const App: React.FC = () => {
                     ? 'Connected to local hub & backed up in browser storage'
                     : 'Running in offline browser storage'
                 }
-                className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700"
+                className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs sm:text-sm font-medium text-slate-700"
               >
                 <span
-                  className={`h-2 w-2 rounded-full ${
+                  className={`h-2.5 w-2.5 rounded-full ${
                     connected ? 'bg-emerald-500' : 'bg-amber-500'
                   }`}
                 />
@@ -240,7 +243,7 @@ export const App: React.FC = () => {
           </div>
 
           {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center gap-1" aria-label="Main Navigation">
+          <nav className="hidden lg:flex items-center gap-1.5" aria-label="Main Navigation">
             {navItems.map((item) => {
               const active = section === item.id;
               return (
@@ -248,7 +251,7 @@ export const App: React.FC = () => {
                   key={item.id}
                   type="button"
                   onClick={() => setSection(item.id)}
-                  className={`relative flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                  className={`relative flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition ${
                     active
                       ? 'bg-blue-600 text-white'
                       : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
@@ -258,7 +261,7 @@ export const App: React.FC = () => {
                   <span>{item.label}</span>
                   {item.badge !== undefined && item.badge > 0 && (
                     <span
-                      className={`ml-0.5 rounded-full px-1.5 py-0.2 text-[11px] font-bold tabular-nums ${
+                      className={`ml-0.5 rounded-full px-1.5 py-0.2 text-xs font-bold tabular-nums ${
                         active ? 'bg-white text-blue-700' : 'bg-blue-100 text-blue-800'
                       }`}
                     >
@@ -270,9 +273,9 @@ export const App: React.FC = () => {
             })}
           </nav>
 
-          {/* Compact Staff Indicator */}
+          {/* Compact Staff Indicator + Tutorial Help */}
           <div className="flex items-center gap-2">
-            <label htmlFor="staff-name-input" className="hidden sm:inline text-xs font-medium text-slate-600">
+            <label htmlFor="staff-name-input" className="hidden sm:inline text-sm font-medium text-slate-600">
               Staff:
             </label>
             <input
@@ -281,8 +284,17 @@ export const App: React.FC = () => {
               value={staffName}
               onChange={(e) => setStaffName(e.target.value)}
               aria-label="Staff Name"
-              className="w-24 sm:w-28 rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-900 focus:border-blue-600 focus:bg-white focus:outline-none"
+              className="w-24 sm:w-32 rounded-xl border border-slate-300 bg-slate-50 px-3 py-1.5 text-sm font-semibold text-slate-900 focus:border-blue-600 focus:bg-white focus:outline-none"
             />
+            <button
+              type="button"
+              onClick={() => setShowTutorial(true)}
+              title="Open Quick Guide"
+              aria-label="Open Quick Guide"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+            >
+              <HelpCircle className="h-5 w-5" />
+            </button>
           </div>
         </div>
       </header>
@@ -360,16 +372,17 @@ export const App: React.FC = () => {
             dataDir={data.dataDir}
             onRefresh={loadBootstrap}
             onOpenDeviceStudio={() => setDeviceStudio(true)}
+            onOpenTutorial={() => setShowTutorial(true)}
           />
         )}
       </main>
 
       {/* Tablet & Phone Fixed Bottom Navigation Bar */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white px-2 py-1.5 shadow-[0_-4px_12px_rgba(15,23,42,0.06)] lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white px-2.5 py-2 shadow-[0_-4px_12px_rgba(15,23,42,0.06)] lg:hidden"
         aria-label="Mobile Navigation"
       >
-        <div className="mx-auto grid max-w-xl grid-cols-6 gap-1">
+        <div className="mx-auto grid max-w-2xl grid-cols-6 gap-1.5">
           {navItems.map((item) => {
             const active = section === item.id;
             return (
@@ -377,7 +390,7 @@ export const App: React.FC = () => {
                 key={item.id}
                 type="button"
                 onClick={() => setSection(item.id)}
-                className={`relative flex flex-col items-center justify-center rounded-lg py-2 px-1 transition ${
+                className={`relative flex flex-col items-center justify-center rounded-xl py-2.5 px-1.5 transition ${
                   active
                     ? 'bg-blue-600 text-white'
                     : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
@@ -385,15 +398,15 @@ export const App: React.FC = () => {
               >
                 {item.badge !== undefined && item.badge > 0 && (
                   <span
-                    className={`absolute right-1.5 top-1 rounded-full px-1.5 py-0.2 text-[10px] font-bold tabular-nums ${
+                    className={`absolute right-1.5 top-1 rounded-full px-1.5 py-0.2 text-[11px] font-bold tabular-nums ${
                       active ? 'bg-white text-blue-700' : 'bg-blue-600 text-white'
                     }`}
                   >
                     {item.badge}
                   </span>
                 )}
-                {item.icon}
-                <span className="mt-1 text-[11px] font-semibold leading-none tracking-tight">
+                <span className="[&>svg]:h-5 [&>svg]:w-5">{item.icon}</span>
+                <span className="mt-1.5 text-xs font-semibold leading-none tracking-tight">
                   {item.label}
                 </span>
               </button>
@@ -407,6 +420,14 @@ export const App: React.FC = () => {
           sale={lastSale}
           settings={data.settings}
           onClose={() => setLastSale(null)}
+        />
+      )}
+
+      {showTutorial && (
+        <TutorialModal
+          settings={data.settings}
+          onNavigate={(sec) => setSection(sec)}
+          onClose={() => setShowTutorial(false)}
         />
       )}
     </div>
