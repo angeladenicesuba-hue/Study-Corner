@@ -8,6 +8,8 @@ on:
 jobs:
   build-android:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -71,4 +73,18 @@ jobs:
           name: Study-Corner-POS-APK
           path: src-tauri/gen/android/app/build/outputs/apk/**/debug/*.apk
           if-no-files-found: error
+
+      - name: Prepare Release APK
+        run: |
+          APK_FILE=$(find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          cp "$APK_FILE" Study-Corner-POS.apk
+
+      - name: Publish APK to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Study Corner POS (Latest APK)
+          body: Direct Android APK download for Study Corner POS.
+          files: Study-Corner-POS.apk
+          make_latest: true
 
