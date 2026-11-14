@@ -1,4 +1,4 @@
-name: Build Tauri Android APK
+name: Build Tauri Android APK & Windows Desktop
 
 on:
   push:
@@ -8,8 +8,6 @@ on:
 jobs:
   build-android:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - name: Checkout repository
@@ -67,24 +65,99 @@ jobs:
       - name: Build Debug APK
         run: npx tauri android build --apk --debug --target aarch64
 
-      - name: Upload APK
+      - name: Prepare Release APK
+        run: |
+          mkdir -p release-assets
+          APK_FILE=$(find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          cp "$APK_FILE" release-assets/Study-Corner-POS.apk
+
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Study-Corner-POS-APK
-          path: src-tauri/gen/android/app/build/outputs/apk/**/debug/*.apk
+          path: release-assets/Study-Corner-POS.apk
           if-no-files-found: error
 
-      - name: Prepare Release APK
-        run: |
-          APK_FILE=$(find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" | head -n 1)
-          cp "$APK_FILE" Study-Corner-POS.apk
+  build-windows:
+    runs-on: windows-latest
 
-      - name: Publish APK to GitHub Releases
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies and Tauri CLI
+        run: |
+          npm install
+          npm install -D @tauri-apps/cli@latest
+
+      - name: Build Web Frontend (if needed)
+        shell: bash
+        run: |
+          if [ ! -d "dist/web" ]; then
+            npm run build
+          else
+            echo "Using existing dist/web folder"
+          fi
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Initialize Tauri Rust Architecture
+        shell: bash
+        run: |
+          if [ ! -d "src-tauri" ]; then
+            npx tauri init --ci --app-name "Study Corner POS" --window-title "Study Corner POS" --frontend-dist "../dist/web" --dev-url "http://localhost:5173" --before-dev-command "" --before-build-command ""
+            sed -i 's/"com.tauri.dev"/"com.studycorner.pos"/g' src-tauri/tauri.conf.json
+          fi
+
+      - name: Build Windows Desktop Installer
+        run: npx tauri build
+
+      - name: Prepare Release Windows Installers
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          EXE_FILE=$(find src-tauri/target/release/bundle/nsis -name "*.exe" | head -n 1)
+          MSI_FILE=$(find src-tauri/target/release/bundle/msi -name "*.msi" | head -n 1)
+          [ -n "$EXE_FILE" ] && cp "$EXE_FILE" release-assets/Study-Corner-POS-Setup.exe
+          [ -n "$MSI_FILE" ] && cp "$MSI_FILE" release-assets/Study-Corner-POS.msi
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Study-Corner-POS-Windows
+          path: release-assets/*
+          if-no-files-found: error
+
+  publish-release:
+    needs: [ build-android, build-windows ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Android APK
+        uses: actions/download-artifact@v4
+        with:
+          name: Study-Corner-POS-APK
+          path: release-assets
+
+      - name: Download Windows Installers
+        uses: actions/download-artifact@v4
+        with:
+          name: Study-Corner-POS-Windows
+          path: release-assets
+
+      - name: Publish to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: Study Corner POS (Latest APK)
-          body: Direct Android APK download for Study Corner POS.
-          files: Study-Corner-POS.apk
+          name: Study Corner POS (Latest APK & Windows)
+          body: Direct downloads for Android (APK) and Windows Desktop (EXE / MSI). For the full Counter PC SQLite + LAN Hub, run Start-StudyCorner-POS.bat.
+          files: release-assets/*
           make_latest: true
-
