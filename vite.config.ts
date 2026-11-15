@@ -5,6 +5,11 @@ import path from 'path';
 export default defineConfig({
   root: 'web',
   plugins: [react()],
+  define: {
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),
+    __APP_BUILD_NUMBER__: JSON.stringify(Number(process.env.GITHUB_RUN_NUMBER || 0)),
+    __APP_BUILD_COMMIT__: JSON.stringify((process.env.GITHUB_SHA || 'local').slice(0, 7)),
+  },
   resolve: {
     alias: {
       '@shared': path.resolve(__dirname, './shared'),

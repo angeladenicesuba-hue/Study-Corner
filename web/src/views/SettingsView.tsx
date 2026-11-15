@@ -14,9 +14,12 @@ import {
   Moon,
   Type,
   HelpCircle,
+  RefreshCw,
+  Download,
 } from 'lucide-react';
 import { AppSettings, Product } from '@shared/types';
 import { api } from '../api';
+import { checkForAppUpdate, CURRENT_APP_BUILD, UpdateCheckResult } from '../updater';
 import {
   loadUiPreferences,
   saveUiPreferences,
@@ -61,6 +64,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [newProdCategory, setNewProdCategory] = useState<'iced_coffee' | 'non_coffee' | 'lunch_dinner'>('iced_coffee');
   const [newProdPrice, setNewProdPrice] = useState('');
   const [banner, setBanner] = useState('');
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateResult, setUpdateResult] = useState<UpdateCheckResult | null>(null);
 
   const handleQrFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -592,6 +597,67 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
             <div className="font-mono text-[11px] text-slate-600 break-all">
               Data Folder: {dataDir}
+            </div>
+
+            {/* App Version & In-App APK Updater */}
+            <div className="border-t border-slate-100 pt-3 space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-slate-700">
+                  App Version:{' '}
+                  <strong className="text-slate-900">
+                    v{CURRENT_APP_BUILD.version}
+                    {CURRENT_APP_BUILD.buildNumber > 0
+                      ? ` (Build #${CURRENT_APP_BUILD.buildNumber})`
+                      : ` (${CURRENT_APP_BUILD.commit})`}
+                  </strong>
+                </div>
+                <button
+                  type="button"
+                  disabled={checkingUpdate}
+                  onClick={async () => {
+                    setCheckingUpdate(true);
+                    const res = await checkForAppUpdate();
+                    setUpdateResult(res);
+                    setCheckingUpdate(false);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${checkingUpdate ? 'animate-spin' : ''}`} />
+                  <span>{checkingUpdate ? 'Checking...' : 'Check for Update'}</span>
+                </button>
+              </div>
+
+              {updateResult && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs">
+                  {updateResult.error ? (
+                    <span className="text-slate-600">
+                      Could not check for updates ({updateResult.error}).
+                    </span>
+                  ) : updateResult.hasUpdate && updateResult.remote ? (
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-bold text-slate-900">
+                        Update ready: Build #{updateResult.remote.buildNumber}
+                      </span>
+                      <a
+                        href={updateResult.remote.apkUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-700"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        <span>Download & Update APK</span>
+                      </a>
+                    </div>
+                  ) : (
+                    <span className="font-semibold text-emerald-800">
+                      You are on the latest release
+                      {updateResult.remote?.buildNumber
+                        ? ` (Latest Build #${updateResult.remote.buildNumber})`
+                        : '.'}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex flex-wrap items-center gap-2 pt-1">

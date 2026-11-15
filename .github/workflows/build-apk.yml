@@ -23,13 +23,11 @@ jobs:
           npm install
           npm install -D @tauri-apps/cli@latest
 
-      - name: Build Web Frontend (if needed)
-        run: |
-          if [ ! -d "dist/web" ]; then
-            npm run build
-          else
-            echo "Using existing dist/web folder"
-          fi
+      - name: Build Web Frontend with Build Metadata
+        env:
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: npm run build
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -61,15 +59,36 @@ jobs:
           if [ ! -d "src-tauri/gen/android" ]; then
             npx tauri android init --ci
           fi
+          # Bump Android versionCode so in-place APK updates succeed
+          if [ -f "src-tauri/gen/android/app/build.gradle.kts" ]; then
+            sed -i "s/versionCode = [0-9]*/versionCode = ${{ github.run_number }}/g" src-tauri/gen/android/app/build.gradle.kts
+          fi
 
-      - name: Build Debug APK
-        run: npx tauri android build --apk --debug --target aarch64
-
-      - name: Prepare Release APK
+      - name: Build & Sign Android APK
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           mkdir -p release-assets
-          APK_FILE=$(find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" | head -n 1)
-          cp "$APK_FILE" release-assets/Study-Corner-POS.apk
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > release-keystore.jks
+            npx tauri android build --apk --target aarch64
+            UNSIGNED_APK=$(find src-tauri/gen/android/app/build/outputs/apk -name "*-unsigned.apk" -o -name "*.apk" | head -n 1)
+            BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
+            "$BUILD_TOOLS/apksigner" sign \
+              --ks release-keystore.jks \
+              --ks-pass "pass:$ANDROID_KEYSTORE_PASSWORD" \
+              --ks-key-alias "$ANDROID_KEY_ALIAS" \
+              --key-pass "pass:$ANDROID_KEY_PASSWORD" \
+              --out release-assets/Study-Corner-POS.apk \
+              "$UNSIGNED_APK"
+          else
+            npx tauri android build --apk --debug --target aarch64
+            APK_FILE=$(find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" | head -n 1)
+            cp "$APK_FILE" release-assets/Study-Corner-POS.apk
+          fi
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
@@ -152,6 +171,18 @@ jobs:
         with:
           name: Study-Corner-POS-Windows
           path: release-assets
+
+      - name: Generate version.json for In-App Updater
+        run: |
+          cat <<EOF > release-assets/version.json
+          {
+            "version": "1.0.0",
+            "buildNumber": ${{ github.run_number }},
+            "commit": "${GITHUB_SHA::7}",
+            "builtAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "apkUrl": "https://github.com/angeladenicesuba-hue/Study-Corner/releases/download/latest/Study-Corner-POS.apk"
+          }
+          EOF
 
       - name: Publish to GitHub Releases
         uses: softprops/action-gh-release@v2

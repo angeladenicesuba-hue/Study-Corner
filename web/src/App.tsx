@@ -6,11 +6,13 @@ import {
   Settings,
   AlertTriangle,
   HelpCircle,
+  Download,
   X,
 } from 'lucide-react';
 import { SaleRecord } from '@shared/types';
 import { isClosingSoon } from '@shared/billing';
 import { api, BootstrapData, isServerOnline } from './api';
+import { AppVersionInfo, checkForAppUpdate } from './updater';
 import { StudySubTab, StudyView } from './views/StudyView';
 import { FoodPosView } from './views/FoodPosView';
 import { LedgerView } from './views/LedgerView';
@@ -45,6 +47,8 @@ export const App: React.FC = () => {
   const [connected, setConnected] = useState<boolean>(true);
   const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
   const [showTutorial, setShowTutorial] = useState<boolean>(() => !hasSeenTutorial());
+  const [availableUpdate, setAvailableUpdate] = useState<AppVersionInfo | null>(null);
+  const [dismissedUpdate, setDismissedUpdate] = useState<boolean>(false);
   const [deviceStudio, setDeviceStudio] = useState<boolean>(() => {
     return new URLSearchParams(window.location.search).get('preview') === 'devices';
   });
@@ -58,6 +62,11 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     loadBootstrap();
+    checkForAppUpdate().then((res) => {
+      if (res.hasUpdate && res.remote) {
+        setAvailableUpdate(res.remote);
+      }
+    });
 
     let evtSource: EventSource | null = null;
     try {
@@ -301,6 +310,36 @@ export const App: React.FC = () => {
           </div>
         </div>
       </header>
+
+      {/* In-App APK Update Banner (shown only when a newer build is on GitHub Releases) */}
+      {availableUpdate && !dismissedUpdate && (
+        <div className="border-b border-emerald-200 bg-emerald-50 px-4 py-2 text-xs text-emerald-950">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2">
+            <span className="font-semibold">
+              New Study Corner POS update available (Build #{availableUpdate.buildNumber}).
+            </span>
+            <div className="flex items-center gap-2">
+              <a
+                href={availableUpdate.apkUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1 text-xs font-bold text-white hover:bg-blue-700"
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span>Update APK</span>
+              </a>
+              <button
+                type="button"
+                onClick={() => setDismissedUpdate(true)}
+                aria-label="Dismiss update banner"
+                className="rounded-lg p-1 text-emerald-800 hover:bg-emerald-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 8:45 PM Closing Reminder Banner */}
       {closingSoon && data.activeVisits.length > 0 && (
