@@ -2,15 +2,32 @@ import React, { useEffect, useState } from 'react';
 import {
   Users,
   LogOut,
-  Plus,
   Trash2,
   Award,
   CheckCircle2,
   Clock,
   Utensils,
+  UserCheck,
+  AlertTriangle,
+  ChevronDown,
 } from 'lucide-react';
-import { AppSettings, PaymentInput, Product, SaleLine, SaleRecord, Visit } from '@shared/types';
-import { computeElapsedMinutes, computeTimeCharge, formatPeso } from '@shared/billing';
+import {
+  AppSettings,
+  Customer,
+  PaymentInput,
+  PlanSub,
+  Product,
+  SaleLine,
+  SaleRecord,
+  Visit,
+} from '@shared/types';
+import {
+  computeElapsedMinutes,
+  computeTimeCharge,
+  formatPeso,
+  isPlanActiveOnDate,
+  isWithinOperatingHours,
+} from '@shared/billing';
 import { api } from '../api';
 import { PaymentModal } from '../components/PaymentModal';
 
@@ -18,20 +35,24 @@ interface WhosInViewProps {
   visits: Visit[];
   products: Product[];
   settings: AppSettings;
+  customers: Customer[];
+  planSubs: PlanSub[];
   staffName: string;
   onRefresh: () => void;
   onSaleCompleted: (sale: SaleRecord) => void;
-  onGoTimeIn: () => void;
+  onGoTimeIn?: () => void;
+  hideHeader?: boolean;
 }
 
 export const WhosInView: React.FC<WhosInViewProps> = ({
   visits,
   products,
   settings,
+  customers,
+  planSubs,
   staffName,
   onRefresh,
   onSaleCompleted,
-  onGoTimeIn,
 }) => {
   const [nowIso, setNowIso] = useState<string>(() => new Date().toISOString());
   const [foodDrawerVisitId, setFoodDrawerVisitId] = useState<number | null>(null);
@@ -41,6 +62,19 @@ export const WhosInView: React.FC<WhosInViewProps> = ({
     minutesStayed: number;
     lines: SaleLine[];
   } | null>(null);
+
+  // Inline Quick Time-In state
+  const [customerName, setCustomerName] = useState('');
+  const [isMember, setIsMember] = useState(false);
+  const [memberCardNo, setMemberCardNo] = useState('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
+  const [notes, setNotes] = useState('');
+  const [showDetails, setShowDetails] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [allowOutsideHours, setAllowOutsideHours] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [timeInError, setTimeInError] = useState('');
 
   useEffect(() => {
     const timer = setInterval(() => setNowIso(new Date().toISOString()), 15000);
@@ -90,42 +124,263 @@ export const WhosInView: React.FC<WhosInViewProps> = ({
     return `${h}h ${m.toString().padStart(2, '0')}m`;
   };
 
-  if (visits.length === 0) {
-    return (
-      <div className="mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
-          <Users className="h-6 w-6" />
+  const now = new Date();
+  const todayYmd = now.toISOString().slice(0, 10);
+  const withinHours = isWithinOperatingHours(now, settings.openHour, settings.closeHour);
+  const query = customerName.trim().toLowerCase();
+  const matchingCustomers =
+    showSuggestions && query.length > 0 && selectedCustomerId === null
+      ? customers
+          .filter(
+            (c) =>
+              c.name.toLowerCase().includes(query) ||
+              (c.memberCardNo && c.memberCardNo.toLowerCase().includes(query))
+          )
+          .slice(0, 6)
+      : [];
+
+  const handleSelectCustomer = (c: Customer) => {
+    setSelectedCustomerId(c.id);
+    setCustomerName(c.name);
+    setIsMember(Boolean(c.isMember));
+    setMemberCardNo(c.memberCardNo || '');
+    setShowSuggestions(false);
+
+    const activePlan = planSubs.find(
+      (p) => p.customerId === c.id && isPlanActiveOnDate(p, todayYmd)
+    );
+    setSelectedPlanId(activePlan ? activePlan.id : null);
+  };
+
+  const handleQuickTimeIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customerName.trim()) {
+      setTimeInError('Enter the customer name to start a session.');
+      return;
+    }
+    setTimeInError('');
+    setSubmitting(true);
+    try {
+      await api.timeIn({
+        customerId: selectedCustomerId,
+        customerName: customerName.trim(),
+        isMember,
+        memberCardNo: memberCardNo.trim() || null,
+        planSubId: selectedPlanId,
+        notes: notes.trim() || null,
+        allowOutsideHours: !withinHours ? allowOutsideHours : true,
+      });
+      setCustomerName('');
+      setIsMember(false);
+      setMemberCardNo('');
+      setSelectedCustomerId(null);
+      setSelectedPlanId(null);
+      setNotes('');
+      setShowDetails(false);
+      onRefresh();
+    } catch (err: any) {
+      setTimeInError(err?.message || 'Could not start study session.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const baseNonMember = settings.tiers[0]?.nonMember ?? 80;
+  const baseMember = settings.tiers[0]?.member ?? 70;
+  const activeProducts = products.filter((p) => p.active);
+
+  const quickTimeInBar = (
+    <form
+      onSubmit={handleQuickTimeIn}
+      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_2px_8px_rgba(15,23,42,0.04)] space-y-3"
+    >
+      {!withinHours && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+          <span className="inline-flex items-center gap-1.5 font-medium">
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-700" />
+            Outside hours ({settings.openHour}:00 AM – {settings.closeHour - 12}:00 PM)
+          </span>
+          <label className="inline-flex items-center gap-1.5 font-bold cursor-pointer">
+            <input
+              type="checkbox"
+              checked={allowOutsideHours}
+              onChange={(e) => setAllowOutsideHours(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-amber-400"
+            />
+            Allow Override
+          </label>
         </div>
-        <h2 className="mt-4 text-lg font-bold text-slate-900">No Active Sessions</h2>
-        <p className="mt-1 text-sm text-slate-600">
-          Check in a student when they arrive to start their post-pay timer.
-        </p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2.5">
+        {/* Name / Card Autocomplete Input */}
+        <div className="relative flex-1 min-w-[200px]">
+          <input
+            id="quick-timein-name"
+            type="text"
+            autoComplete="off"
+            value={customerName}
+            onFocus={() => setShowSuggestions(true)}
+            onChange={(e) => {
+              setCustomerName(e.target.value);
+              setSelectedCustomerId(null);
+              setSelectedPlanId(null);
+              setShowSuggestions(true);
+            }}
+            placeholder="Quick Time In: student name or card # (e.g. Juan)"
+            aria-label="Student or Customer Name"
+            className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none"
+          />
+
+          {matchingCustomers.length > 0 && (
+            <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg divide-y divide-slate-100">
+              {matchingCustomers.map((c) => {
+                const activePlan = planSubs.find(
+                  (p) => p.customerId === c.id && isPlanActiveOnDate(p, todayYmd)
+                );
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => handleSelectCustomer(c)}
+                    className="flex w-full items-center justify-between px-3.5 py-2 text-left text-xs hover:bg-blue-50"
+                  >
+                    <div>
+                      <div className="font-bold text-slate-900">{c.name}</div>
+                      {c.memberCardNo && (
+                        <div className="text-[11px] text-slate-600">Card: {c.memberCardNo}</div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {Boolean(c.isMember) && (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-900">
+                          Member
+                        </span>
+                      )}
+                      {activePlan && (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-900">
+                          Plan
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Walk-In / Member 1-Tap Switch */}
+        <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+          <button
+            type="button"
+            onClick={() => setIsMember(false)}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition tabular-nums ${
+              !isMember ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <UserCheck className="h-3.5 w-3.5" />
+            <span>Walk-In ({formatPeso(baseNonMember)})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsMember(true)}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition tabular-nums ${
+              isMember ? 'bg-amber-100 text-amber-950 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Award className="h-3.5 w-3.5" />
+            <span>Member ({formatPeso(baseMember)})</span>
+          </button>
+        </div>
+
+        {/* Optional Details Toggle */}
         <button
-          onClick={onGoTimeIn}
-          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-[0_2px_6px_rgba(37,99,235,0.25)] hover:bg-blue-700"
+          type="button"
+          onClick={() => setShowDetails((v) => !v)}
+          className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          aria-expanded={showDetails}
+        >
+          <span>Details</span>
+          <ChevronDown className={`h-3.5 w-3.5 transition ${showDetails ? 'rotate-180' : ''}`} />
+        </button>
+
+        {/* Submit Time In */}
+        <button
+          type="submit"
+          disabled={submitting}
+          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-[0_2px_6px_rgba(37,99,235,0.2)] hover:bg-blue-700 disabled:opacity-50"
         >
           <Clock className="h-4 w-4" />
-          Time In Customer
+          <span>{submitting ? 'Starting...' : 'Time In'}</span>
         </button>
+      </div>
+
+      {selectedPlanId && (
+        <div className="flex items-center justify-between rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-950">
+          <span className="inline-flex items-center gap-1.5 font-bold">
+            <CheckCircle2 className="h-4 w-4 text-emerald-700" />
+            Covered by Active Study Plan (₱0 time charge)
+          </span>
+          <button
+            type="button"
+            onClick={() => setSelectedPlanId(null)}
+            className="font-semibold underline"
+          >
+            Remove
+          </button>
+        </div>
+      )}
+
+      {showDetails && (
+        <div className="grid gap-2.5 border-t border-slate-100 pt-2.5 sm:grid-cols-2">
+          <input
+            type="text"
+            value={memberCardNo}
+            onChange={(e) => setMemberCardNo(e.target.value)}
+            placeholder="Member Card No. (optional)"
+            aria-label="Member Card Number"
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400"
+          />
+          <input
+            type="text"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Notes / Seat / Request (optional)"
+            aria-label="Notes"
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400"
+          />
+        </div>
+      )}
+
+      {timeInError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-900">
+          {timeInError}
+        </div>
+      )}
+    </form>
+  );
+
+  if (visits.length === 0) {
+    return (
+      <div className="space-y-5">
+        {quickTimeInBar}
+        <div className="mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
+            <Users className="h-6 w-6" />
+          </div>
+          <h2 className="mt-4 text-lg font-bold text-slate-900">No Active Sessions</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Type a student name above and tap Time In to start their post-pay timer.
+          </p>
+        </div>
       </div>
     );
   }
 
-  const activeProducts = products.filter((p) => p.active);
-
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-xl font-bold tracking-tight text-slate-900">
-          Who's In <span className="text-slate-600 font-semibold tabular-nums">({visits.length})</span>
-        </h2>
-        <button
-          onClick={onGoTimeIn}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-[0_2px_6px_rgba(37,99,235,0.2)] hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4" /> Time In
-        </button>
-      </div>
+      {quickTimeInBar}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {visits.map((v) => {

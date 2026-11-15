@@ -1,15 +1,70 @@
 import React, { useState } from 'react';
-import { Coffee, CupSoda, Utensils, Plus, Minus, ShoppingBag, Trash2 } from 'lucide-react';
-import { AppSettings, PaymentInput, Product, SaleLine, SaleRecord } from '@shared/types';
+import {
+  Beef,
+  CheckCircle2,
+  Citrus,
+  Coffee,
+  CupSoda,
+  Drumstick,
+  Egg,
+  Leaf,
+  Milk,
+  Minus,
+  Plus,
+  ShoppingBag,
+  Trash2,
+  Utensils,
+} from 'lucide-react';
+import { AppSettings, PaymentInput, Product, SaleLine, SaleRecord, Visit } from '@shared/types';
 import { formatPeso } from '@shared/billing';
 import { api } from '../api';
 import { PaymentModal } from '../components/PaymentModal';
+
+function getProductIcon(product: Product): React.ReactNode {
+  const n = product.name.toLowerCase();
+  const cls = 'h-4 w-4 shrink-0';
+
+  if (n.includes('lemon') || n.includes('sprite') || n.includes('citrus')) {
+    return <Citrus className={cls} />;
+  }
+  if (n.includes('matcha') || n.includes('tea')) {
+    return <Leaf className={cls} />;
+  }
+  if (n.includes('strawberry') || n.includes('milk')) {
+    return <Milk className={cls} />;
+  }
+  if (n.includes('milo')) {
+    return <CupSoda className={cls} />;
+  }
+  if (n.includes('egg') || n.includes('pastil')) {
+    return <Egg className={cls} />;
+  }
+  if (n.includes('beef') || n.includes('steak') || n.includes('pork')) {
+    return <Beef className={cls} />;
+  }
+  if (n.includes('chicken')) {
+    return <Drumstick className={cls} />;
+  }
+
+  switch (product.category) {
+    case 'iced_coffee':
+      return <Coffee className={cls} />;
+    case 'non_coffee':
+      return <CupSoda className={cls} />;
+    case 'lunch_dinner':
+      return <Utensils className={cls} />;
+    default:
+      return <ShoppingBag className={cls} />;
+  }
+}
 
 interface FoodPosViewProps {
   products: Product[];
   settings: AppSettings;
   staffName: string;
+  activeVisits?: Visit[];
   onSaleCompleted: (sale: SaleRecord) => void;
+  onTabUpdated?: () => void;
 }
 
 const CATEGORIES: Array<{ id: string; label: string; icon: React.ReactNode }> = [
@@ -23,12 +78,17 @@ export const FoodPosView: React.FC<FoodPosViewProps> = ({
   products,
   settings,
   staffName,
+  activeVisits = [],
   onSaleCompleted,
+  onTabUpdated,
 }) => {
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [customerName, setCustomerName] = useState<string>('Walk-in Customer');
+  const [targetVisitId, setTargetVisitId] = useState<number | 'walk_in'>('walk_in');
   const [cart, setCart] = useState<Record<number, number>>({});
   const [showPayModal, setShowPayModal] = useState<boolean>(false);
+  const [addingToTab, setAddingToTab] = useState<boolean>(false);
+  const [tabBanner, setTabBanner] = useState<string>('');
 
   const visibleProducts = products.filter(
     (p) => p.active && (activeCategory === 'all' || p.category === activeCategory)
@@ -75,6 +135,33 @@ export const FoodPosView: React.FC<FoodPosViewProps> = ({
     onSaleCompleted(sale);
   };
 
+  const selectedVisit =
+    targetVisitId === 'walk_in'
+      ? null
+      : activeVisits.find((v) => v.id === targetVisitId) || null;
+
+  const handlePrimaryOrderAction = async () => {
+    if (cartLines.length === 0) return;
+    if (selectedVisit) {
+      setAddingToTab(true);
+      try {
+        for (const [idStr, qty] of Object.entries(cart)) {
+          if (qty > 0) {
+            await api.addFoodToVisit(selectedVisit.id, Number(idStr), qty);
+          }
+        }
+        setTabBanner(`Added ${formatPeso(cartTotal)} to ${selectedVisit.customerName}'s tab.`);
+        setCart({});
+        setTargetVisitId('walk_in');
+        onTabUpdated?.();
+      } finally {
+        setAddingToTab(false);
+      }
+      return;
+    }
+    setShowPayModal(true);
+  };
+
   return (
     <div className="grid gap-6 lg:grid-cols-3 items-start">
       {/* Menu Grid */}
@@ -100,7 +187,34 @@ export const FoodPosView: React.FC<FoodPosViewProps> = ({
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {visibleProducts.map((p) => {
             const qtyInCart = cart[p.id] || 0;
-            return (
+            const selectedVisit =
+    targetVisitId === 'walk_in'
+      ? null
+      : activeVisits.find((v) => v.id === targetVisitId) || null;
+
+  const handlePrimaryOrderAction = async () => {
+    if (cartLines.length === 0) return;
+    if (selectedVisit) {
+      setAddingToTab(true);
+      try {
+        for (const [idStr, qty] of Object.entries(cart)) {
+          if (qty > 0) {
+            await api.addFoodToVisit(selectedVisit.id, Number(idStr), qty);
+          }
+        }
+        setTabBanner(`Added ${formatPeso(cartTotal)} to ${selectedVisit.customerName}'s tab.`);
+        setCart({});
+        setTargetVisitId('walk_in');
+        onTabUpdated?.();
+      } finally {
+        setAddingToTab(false);
+      }
+      return;
+    }
+    setShowPayModal(true);
+  };
+
+  return (
               <button
                 key={p.id}
                 type="button"
@@ -111,7 +225,19 @@ export const FoodPosView: React.FC<FoodPosViewProps> = ({
                     : 'border-slate-200 bg-white hover:border-slate-300'
                 }`}
               >
-                <div className="text-sm font-bold text-slate-900">{p.name}</div>
+                <div className="flex items-center gap-2.5">
+                  <span
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition ${
+                      qtyInCart > 0
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-100 text-slate-800'
+                    }`}
+                    aria-hidden="true"
+                  >
+                    {getProductIcon(p)}
+                  </span>
+                  <div className="text-sm font-bold text-slate-900 leading-snug">{p.name}</div>
+                </div>
                 <div className="mt-3 flex items-center justify-between tabular-nums">
                   <span className="text-base font-extrabold text-blue-700">{formatPeso(p.price)}</span>
                   {qtyInCart > 0 && (
@@ -141,17 +267,56 @@ export const FoodPosView: React.FC<FoodPosViewProps> = ({
           )}
         </div>
 
-        <div className="mt-3">
-          <label htmlFor="food-customer-input" className="block text-xs font-semibold text-slate-700">
-            Customer Name
+        {tabBanner && (
+          <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-950">
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle2 className="h-4 w-4 text-emerald-700 shrink-0" />
+              <span>{tabBanner}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setTabBanner('')}
+              className="font-bold underline"
+            >
+              OK
+            </button>
+          </div>
+        )}
+
+        <div className="mt-3 space-y-2">
+          <label htmlFor="food-order-target" className="block text-xs font-semibold text-slate-700">
+            Order For
           </label>
-          <input
-            id="food-customer-input"
-            type="text"
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-            className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-900"
-          />
+          {activeVisits.length > 0 ? (
+            <select
+              id="food-order-target"
+              value={selectedVisit ? String(selectedVisit.id) : 'walk_in'}
+              onChange={(e) => {
+                const val = e.target.value;
+                setTargetVisitId(val === 'walk_in' ? 'walk_in' : Number(val));
+              }}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900"
+            >
+              <option value="walk_in">Walk-in Customer (Pay Now)</option>
+              {activeVisits.map((v) => (
+                <option key={v.id} value={v.id}>
+                  Add to Tab: {v.customerName}
+                </option>
+              ))}
+            </select>
+          ) : null}
+
+          {!selectedVisit && (
+            <input
+              id="food-customer-input"
+              type="text"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              aria-label="Walk-in Customer Name"
+              placeholder="Walk-in Customer"
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-medium text-slate-900"
+            />
+          )}
         </div>
 
         <div className="mt-4 divide-y divide-slate-100">
@@ -162,7 +327,34 @@ export const FoodPosView: React.FC<FoodPosViewProps> = ({
           ) : (
             cartLines.map((line) => {
               const prod = products.find((p) => p.name === line.item)!;
-              return (
+              const selectedVisit =
+    targetVisitId === 'walk_in'
+      ? null
+      : activeVisits.find((v) => v.id === targetVisitId) || null;
+
+  const handlePrimaryOrderAction = async () => {
+    if (cartLines.length === 0) return;
+    if (selectedVisit) {
+      setAddingToTab(true);
+      try {
+        for (const [idStr, qty] of Object.entries(cart)) {
+          if (qty > 0) {
+            await api.addFoodToVisit(selectedVisit.id, Number(idStr), qty);
+          }
+        }
+        setTabBanner(`Added ${formatPeso(cartTotal)} to ${selectedVisit.customerName}'s tab.`);
+        setCart({});
+        setTargetVisitId('walk_in');
+        onTabUpdated?.();
+      } finally {
+        setAddingToTab(false);
+      }
+      return;
+    }
+    setShowPayModal(true);
+  };
+
+  return (
                 <div key={prod.id} className="flex items-center justify-between py-2.5">
                   <div className="pr-2">
                     <div className="text-sm font-bold text-slate-900">{line.item}</div>
@@ -203,11 +395,15 @@ export const FoodPosView: React.FC<FoodPosViewProps> = ({
           </div>
           <button
             type="button"
-            disabled={cartLines.length === 0}
-            onClick={() => setShowPayModal(true)}
+            disabled={cartLines.length === 0 || addingToTab}
+            onClick={handlePrimaryOrderAction}
             className="w-full rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-[0_2px_6px_rgba(37,99,235,0.25)] hover:bg-blue-700 disabled:opacity-40"
           >
-            Charge {formatPeso(cartTotal)}
+            {selectedVisit
+              ? addingToTab
+                ? 'Adding to Tab...'
+                : `Add to ${selectedVisit.customerName}'s Tab (${formatPeso(cartTotal)})`
+              : `Charge ${formatPeso(cartTotal)}`}
           </button>
         </div>
       </div>

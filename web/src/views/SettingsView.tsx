@@ -54,7 +54,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onOpenDeviceStudio,
   onOpenTutorial,
 }) => {
-  const [tab, setTab] = useState<'menu' | 'rates' | 'qr' | 'sync' | 'appearance'>('menu');
+  const [tab, setTab] = useState<'menu_rates' | 'payments_display' | 'sync'>('menu_rates');
   const [uiPrefs, setUiPrefs] = useState<UiPreferences>(() => loadUiPreferences());
   const [formSettings, setFormSettings] = useState<AppSettings>(settings);
   const [newProdName, setNewProdName] = useState('');
@@ -164,49 +164,35 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Sub-navigation Tabs */}
+      {/* Sub-navigation Tabs (Consolidated to 3) */}
       <div className="flex justify-center">
         <div className="inline-flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1">
           <button
             type="button"
             onClick={() => {
-              setTab('menu');
+              setTab('menu_rates');
               setBanner('');
             }}
             className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold transition ${
-              tab === 'menu' ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
+              tab === 'menu_rates' ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
             }`}
           >
             <Utensils className="h-3.5 w-3.5" />
-            <span>Menu ({products.length})</span>
+            <span>Menu & Rates</span>
           </button>
 
           <button
             type="button"
             onClick={() => {
-              setTab('rates');
+              setTab('payments_display');
               setBanner('');
             }}
             className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold transition ${
-              tab === 'rates' ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
-            }`}
-          >
-            <DollarSign className="h-3.5 w-3.5" />
-            <span>Rates & Plans</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setTab('qr');
-              setBanner('');
-            }}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold transition ${
-              tab === 'qr' ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
+              tab === 'payments_display' ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
             }`}
           >
             <QrCode className="h-3.5 w-3.5" />
-            <span>QR Ph</span>
+            <span>QR & Display</span>
           </button>
 
           <button
@@ -222,20 +208,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <Smartphone className="h-3.5 w-3.5" />
             <span>Sync & Backup</span>
           </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setTab('appearance');
-              setBanner('');
-            }}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold transition ${
-              tab === 'appearance' ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
-            }`}
-          >
-            <Type className="h-3.5 w-3.5" />
-            <span>Appearance</span>
-          </button>
         </div>
       </div>
 
@@ -246,8 +218,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
-      {/* Tab 5: Appearance, Theme & UI Scale */}
-      {tab === 'appearance' && (
+      {/* Tab: QR & Display */}
+      {tab === 'payments_display' && (
         <div className="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_2px_8px_rgba(15,23,42,0.04)] space-y-6">
           <div>
             <h2 className="text-lg font-bold text-slate-900">Appearance & Readability</h2>
@@ -335,7 +307,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       )}
 
       {/* Tab 1: Food & Drinks Menu Editor */}
-      {tab === 'menu' && (
+      {tab === 'menu_rates' && (
         <div className="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_2px_8px_rgba(15,23,42,0.04)] space-y-5">
           <div>
             <h2 className="text-lg font-bold text-slate-900">Food & Drinks Menu</h2>
@@ -439,7 +411,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       )}
 
       {/* Tab 2: Rates & Membership Pricing */}
-      {tab === 'rates' && (
+      {tab === 'menu_rates' && (
         <form
           onSubmit={handleSaveRates}
           className="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_2px_8px_rgba(15,23,42,0.04)] space-y-6"
@@ -556,7 +528,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       )}
 
       {/* Tab 3: QR Ph Image Uploader */}
-      {tab === 'qr' && (
+      {tab === 'payments_display' && (
         <div className="mx-auto max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_2px_8px_rgba(15,23,42,0.04)] space-y-5">
           <div>
             <h2 className="text-lg font-bold text-slate-900">Payment QR Ph Code</h2>

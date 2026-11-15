@@ -12,6 +12,7 @@ import {
 import { formatPeso } from '@shared/billing';
 import { api, LedgerResponse } from '../api';
 import { buildCsvFromRecords, downloadTextFile, generateOfflineCsvContent } from '../offlineStore';
+import { LedgerCharts } from '../components/LedgerCharts';
 
 interface LedgerViewProps {
   staffName: string;
@@ -538,6 +539,9 @@ export const LedgerView: React.FC<LedgerViewProps> = ({ staffName }) => {
           </div>
         </div>
       )}
+
+      {/* Visual Charts & Breakdown */}
+      {!loading && data && <LedgerCharts data={data} />}
 
       {/* Transactions Log (Sales & Expenses Switcher) */}
       {!loading && data && (

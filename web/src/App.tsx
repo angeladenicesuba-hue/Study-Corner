@@ -1,9 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Clock,
   Users,
   Utensils,
-  CreditCard,
   BookOpen,
   Settings,
   AlertTriangle,
@@ -13,28 +11,34 @@ import {
 import { SaleRecord } from '@shared/types';
 import { isClosingSoon } from '@shared/billing';
 import { api, BootstrapData, isServerOnline } from './api';
-import { TimeInView } from './views/TimeInView';
-import { WhosInView } from './views/WhosInView';
+import { StudySubTab, StudyView } from './views/StudyView';
 import { FoodPosView } from './views/FoodPosView';
-import { PlansView } from './views/PlansView';
 import { LedgerView } from './views/LedgerView';
 import { SettingsView } from './views/SettingsView';
 import { ReceiptModal } from './components/ReceiptModal';
 import { TutorialModal, hasSeenTutorial } from './components/TutorialModal';
 
-type SectionId = 'whos_in' | 'time_in' | 'food' | 'plans' | 'ledger' | 'settings';
+type SectionId = 'study' | 'food' | 'ledger' | 'settings';
 
-function getInitialSection(): SectionId {
+function getInitialLocation(): { section: SectionId; subTab: StudySubTab } {
   const params = new URLSearchParams(window.location.search);
-  const s = params.get('section') as SectionId | null;
-  if (s && ['whos_in', 'time_in', 'food', 'plans', 'ledger', 'settings'].includes(s)) {
-    return s;
+  const s = params.get('section');
+  if (s === 'plans') {
+    return { section: 'study', subTab: 'plans' };
   }
-  return 'whos_in';
+  if (s === 'time_in' || s === 'whos_in') {
+    return { section: 'study', subTab: 'whos_in' };
+  }
+  if (s === 'food' || s === 'ledger' || s === 'settings' || s === 'study') {
+    return { section: s, subTab: 'whos_in' };
+  }
+  return { section: 'study', subTab: 'whos_in' };
 }
 
 export const App: React.FC = () => {
-  const [section, setSection] = useState<SectionId>(getInitialSection);
+  const [initialLoc] = useState(getInitialLocation);
+  const [section, setSection] = useState<SectionId>(initialLoc.section);
+  const [studySubTab, setStudySubTab] = useState<StudySubTab>(initialLoc.subTab);
   const [data, setData] = useState<BootstrapData | null>(null);
   const [staffName, setStaffName] = useState<string>('Front Desk');
   const [lastSale, setLastSale] = useState<SaleRecord | null>(null);
@@ -114,7 +118,7 @@ export const App: React.FC = () => {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {(['whos_in', 'time_in', 'food', 'plans', 'ledger', 'settings'] as SectionId[]).map((sec) => (
+            {(['study', 'food', 'ledger', 'settings'] as SectionId[]).map((sec) => (
               <button
                 key={sec}
                 onClick={() => setSection(sec)}
@@ -122,7 +126,7 @@ export const App: React.FC = () => {
                   section === sec ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
                 }`}
               >
-                {sec.replace('_', ' ')}
+                {sec === 'food' ? 'Food POS' : sec}
               </button>
             ))}
             <button
@@ -169,15 +173,10 @@ export const App: React.FC = () => {
     badge?: number;
   }> = [
     {
-      id: 'whos_in',
-      label: "Who's In",
+      id: 'study',
+      label: 'Study',
       icon: <Users className="h-4 w-4" />,
       badge: data.activeVisits.length,
-    },
-    {
-      id: 'time_in',
-      label: 'Time In',
-      icon: <Clock className="h-4 w-4" />,
     },
     {
       id: 'food',
@@ -185,19 +184,9 @@ export const App: React.FC = () => {
       icon: <Utensils className="h-4 w-4" />,
     },
     {
-      id: 'plans',
-      label: 'Plans',
-      icon: <CreditCard className="h-4 w-4" />,
-    },
-    {
       id: 'ledger',
       label: 'Ledger',
       icon: <BookOpen className="h-4 w-4" />,
-    },
-    {
-      id: 'settings',
-      label: 'Settings',
-      icon: <Settings className="h-4 w-4" />,
     },
   ];
 
@@ -207,16 +196,16 @@ export const App: React.FC = () => {
     <div className="min-h-screen bg-slate-50 pb-28 lg:pb-12">
       {/* Clean, Calm Top Bar */}
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3.5">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 sm:gap-4 px-3 sm:px-4 py-3">
           {/* Brand & Sync Status */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <img
               src="/logo.png"
               alt="Study Corner Logo"
-              className="h-10 w-10 shrink-0 rounded-xl border border-slate-200 bg-white object-contain p-0.5"
+              className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 rounded-xl border border-slate-200 bg-white object-contain p-0.5"
             />
-            <div className="flex items-center gap-2.5">
-              <span className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="truncate text-base sm:text-xl font-bold tracking-tight text-slate-900">
                 {data.settings.shopName}
               </span>
               <span
@@ -225,14 +214,14 @@ export const App: React.FC = () => {
                     ? 'Connected to local hub & backed up in browser storage'
                     : 'Running in offline browser storage'
                 }
-                className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs sm:text-sm font-medium text-slate-700"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-slate-100 px-2 sm:px-3 py-1 text-xs sm:text-sm font-medium text-slate-700"
               >
                 <span
                   className={`h-2.5 w-2.5 rounded-full ${
                     connected ? 'bg-emerald-500' : 'bg-amber-500'
                   }`}
                 />
-                <span>{connected ? 'Synced' : 'Offline'}</span>
+                <span className="hidden sm:inline">{connected ? 'Synced' : 'Offline'}</span>
                 {pendingSyncCount > 0 && (
                   <span className="font-bold text-amber-800 tabular-nums">
                     ({pendingSyncCount})
@@ -273,9 +262,9 @@ export const App: React.FC = () => {
             })}
           </nav>
 
-          {/* Compact Staff Indicator + Tutorial Help */}
-          <div className="flex items-center gap-2">
-            <label htmlFor="staff-name-input" className="hidden sm:inline text-sm font-medium text-slate-600">
+          {/* Compact Staff Indicator + Quick Guide + Top-Right Settings */}
+          <div className="flex items-center gap-2 shrink-0">
+            <label htmlFor="staff-name-input" className="hidden md:inline text-sm font-medium text-slate-600">
               Staff:
             </label>
             <input
@@ -284,16 +273,30 @@ export const App: React.FC = () => {
               value={staffName}
               onChange={(e) => setStaffName(e.target.value)}
               aria-label="Staff Name"
-              className="w-24 sm:w-32 rounded-xl border border-slate-300 bg-slate-50 px-3 py-1.5 text-sm font-semibold text-slate-900 focus:border-blue-600 focus:bg-white focus:outline-none"
+              className="w-20 sm:w-28 rounded-xl border border-slate-300 bg-slate-50 px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm font-semibold text-slate-900 focus:border-blue-600 focus:bg-white focus:outline-none"
             />
             <button
               type="button"
               onClick={() => setShowTutorial(true)}
               title="Open Quick Guide"
               aria-label="Open Quick Guide"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition"
             >
               <HelpCircle className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setSection(section === 'settings' ? 'study' : 'settings')}
+              title="Settings"
+              aria-label="Settings"
+              aria-pressed={section === 'settings'}
+              className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition ${
+                section === 'settings'
+                  ? 'border-blue-600 bg-blue-600 text-white'
+                  : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              <Settings className="h-5 w-5" />
             </button>
           </div>
         </div>
@@ -309,30 +312,21 @@ export const App: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="mx-auto max-w-6xl px-4 pt-6">
-        {section === 'time_in' && (
-          <TimeInView
-            settings={data.settings}
-            customers={data.customers}
-            planSubs={data.planSubs}
-            onCompleted={() => {
-              loadBootstrap();
-              setSection('whos_in');
-            }}
-          />
-        )}
-
-        {section === 'whos_in' && (
-          <WhosInView
+        {section === 'study' && (
+          <StudyView
+            subTab={studySubTab}
+            onSubTabChange={setStudySubTab}
             visits={data.activeVisits}
             products={data.products}
             settings={data.settings}
+            customers={data.customers}
+            planSubs={data.planSubs}
             staffName={staffName}
             onRefresh={loadBootstrap}
             onSaleCompleted={(sale) => {
               setLastSale(sale);
               loadBootstrap();
             }}
-            onGoTimeIn={() => setSection('time_in')}
           />
         )}
 
@@ -341,23 +335,12 @@ export const App: React.FC = () => {
             products={data.products}
             settings={data.settings}
             staffName={staffName}
+            activeVisits={data.activeVisits}
             onSaleCompleted={(sale) => {
               setLastSale(sale);
               loadBootstrap();
             }}
-          />
-        )}
-
-        {section === 'plans' && (
-          <PlansView
-            settings={data.settings}
-            customers={data.customers}
-            planSubs={data.planSubs}
-            staffName={staffName}
-            onSaleCompleted={(sale) => {
-              setLastSale(sale);
-              loadBootstrap();
-            }}
+            onTabUpdated={loadBootstrap}
           />
         )}
 
@@ -379,10 +362,10 @@ export const App: React.FC = () => {
 
       {/* Tablet & Phone Fixed Bottom Navigation Bar */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white px-2.5 py-2 shadow-[0_-4px_12px_rgba(15,23,42,0.06)] lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white px-3 py-2 shadow-[0_-4px_12px_rgba(15,23,42,0.06)] lg:hidden"
         aria-label="Mobile Navigation"
       >
-        <div className="mx-auto grid max-w-2xl grid-cols-6 gap-1.5">
+        <div className="mx-auto grid max-w-md grid-cols-3 gap-2">
           {navItems.map((item) => {
             const active = section === item.id;
             return (
@@ -426,7 +409,17 @@ export const App: React.FC = () => {
       {showTutorial && (
         <TutorialModal
           settings={data.settings}
-          onNavigate={(sec) => setSection(sec)}
+          onNavigate={(sec) => {
+            if (sec === 'plans') {
+              setSection('study');
+              setStudySubTab('plans');
+            } else if (sec === 'whos_in' || sec === 'time_in') {
+              setSection('study');
+              setStudySubTab('whos_in');
+            } else {
+              setSection(sec);
+            }
+          }}
           onClose={() => setShowTutorial(false)}
         />
       )}

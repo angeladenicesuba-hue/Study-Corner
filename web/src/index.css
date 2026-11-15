@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --sc-mint-white: #F4FFFC;
+  --sc-mint: #91EAAF;
+  --sc-lime: #C3E956;
+  --sc-olive: #4D7111;
+  --sc-forest: #1F4B2C;
+}
+
 @layer base {
   html {
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
@@ -9,18 +17,27 @@
   }
 
   body {
-    @apply bg-slate-50 text-slate-900 antialiased selection:bg-blue-600 selection:text-white;
+    background-color: var(--sc-mint-white);
+    color: var(--sc-forest);
+    @apply antialiased;
+  }
+
+  body ::selection {
+    background-color: var(--sc-mint);
+    color: var(--sc-forest);
   }
 
   html.dark body {
-    @apply bg-slate-950 text-slate-100;
+    background-color: #0b1c11;
+    color: var(--sc-mint-white);
   }
 
   input,
   select,
   button,
   textarea {
-    @apply focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600;
+    @apply focus-visible:outline-2 focus-visible:outline-offset-2;
+    outline-color: var(--sc-olive);
   }
 }
 
@@ -37,55 +54,216 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #91EAAF;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #4D7111;
 }
 
-/* Global Dark Mode surface, border, and text harmonization */
+/* =========================================================
+   Green Screen Palette — Light Mode Harmonization
+   (#F4FFFC, #91EAAF, #C3E956, #4D7111, #1F4B2C)
+   ========================================================= */
+.bg-slate-50 {
+  background-color: #F4FFFC !important;
+}
+.bg-slate-100 {
+  background-color: #E3F9EE !important;
+}
+.bg-slate-900 {
+  background-color: #1F4B2C !important;
+}
+.hover\:bg-slate-50:hover {
+  background-color: #ECFDF5 !important;
+}
+.hover\:bg-slate-100:hover {
+  background-color: #D5F5E3 !important;
+}
+.hover\:bg-slate-800:hover {
+  background-color: #163720 !important;
+}
+
+.border-slate-100 {
+  border-color: #E2F5EB !important;
+}
+.border-slate-200 {
+  border-color: #C4E8D4 !important;
+}
+.border-slate-300 {
+  border-color: #9DD6B7 !important;
+}
+.divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #E2F5EB !important;
+}
+.divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #C4E8D4 !important;
+}
+
+.text-slate-900 {
+  color: #1F4B2C !important;
+}
+.text-slate-800 {
+  color: #245432 !important;
+}
+.text-slate-700 {
+  color: #2E613D !important;
+}
+.text-slate-600,
+.text-slate-500 {
+  color: #3D6E4B !important;
+}
+
+/* Primary Action & Active Accent (#4D7111 / #1F4B2C) */
+.bg-blue-600 {
+  background-color: #4D7111 !important;
+}
+.hover\:bg-blue-700:hover {
+  background-color: #1F4B2C !important;
+}
+.bg-blue-50,
+.bg-blue-50\/60,
+.bg-blue-50\/70,
+.hover\:bg-blue-50:hover {
+  background-color: #ECF8D8 !important;
+}
+.bg-blue-100 {
+  background-color: #D5F5E3 !important;
+}
+.border-blue-600,
+.border-blue-500,
+.hover\:border-blue-500:hover,
+.focus\:border-blue-600:focus {
+  border-color: #4D7111 !important;
+}
+.text-blue-600,
+.text-blue-700 {
+  color: #4D7111 !important;
+}
+.text-blue-800,
+.text-blue-900,
+.text-blue-950 {
+  color: #1F4B2C !important;
+}
+
+/* Secondary Mint & Lime Accents (#91EAAF / #C3E956) */
+.bg-emerald-600 {
+  background-color: #1F4B2C !important;
+}
+.hover\:bg-emerald-700:hover {
+  background-color: #163720 !important;
+}
+.bg-emerald-50 {
+  background-color: #E8FDF1 !important;
+}
+.bg-emerald-100 {
+  background-color: #91EAAF !important;
+}
+.border-emerald-200,
+.border-emerald-300 {
+  border-color: #91EAAF !important;
+}
+.text-emerald-600,
+.text-emerald-700,
+.text-emerald-800,
+.text-emerald-900,
+.text-emerald-950 {
+  color: #1F4B2C !important;
+}
+
+.bg-amber-50,
+.bg-amber-50\/80 {
+  background-color: #F4FBE2 !important;
+}
+.bg-amber-100 {
+  background-color: #C3E956 !important;
+}
+.border-amber-300,
+.border-amber-400,
+.border-amber-500 {
+  border-color: #4D7111 !important;
+}
+.text-amber-700,
+.text-amber-800,
+.text-amber-900,
+.text-amber-950 {
+  color: #1F4B2C !important;
+}
+
+/* =========================================================
+   Green Screen Palette — Dark Mode Harmonization
+   ========================================================= */
 html.dark .bg-white {
-  background-color: #0f172a !important;
+  background-color: #122B1B !important;
 }
 html.dark .bg-slate-50 {
-  background-color: #020617 !important;
+  background-color: #0B1C11 !important;
 }
 html.dark .bg-slate-100 {
-  background-color: #1e293b !important;
+  background-color: #1F4B2C !important;
+}
+html.dark .bg-slate-900 {
+  background-color: #4D7111 !important;
 }
 html.dark .border-slate-200,
 html.dark .border-slate-300,
 html.dark .border-slate-100 {
-  border-color: #334155 !important;
+  border-color: #2A5B3A !important;
 }
 html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
 html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
-  border-color: #1e293b !important;
+  border-color: #1F4B2C !important;
 }
 html.dark .text-slate-900 {
-  color: #f8fafc !important;
+  color: #F4FFFC !important;
 }
 html.dark .text-slate-800 {
-  color: #e2e8f0 !important;
+  color: #DCFCE7 !important;
 }
 html.dark .text-slate-700 {
-  color: #cbd5e1 !important;
+  color: #B6E8C9 !important;
 }
 html.dark .text-slate-600,
 html.dark .text-slate-500 {
-  color: #94a3b8 !important;
+  color: #91EAAF !important;
+}
+html.dark .bg-blue-600 {
+  background-color: #4D7111 !important;
+}
+html.dark .text-blue-600,
+html.dark .text-blue-700 {
+  color: #C3E956 !important;
+}
+html.dark .bg-blue-50,
+html.dark .bg-blue-50\/60,
+html.dark .bg-blue-50\/70,
+html.dark .bg-blue-100 {
+  background-color: #1F4B2C !important;
+}
+html.dark .text-blue-800,
+html.dark .text-blue-900,
+html.dark .text-blue-950 {
+  color: #F4FFFC !important;
+}
+html.dark .bg-emerald-50 {
+  background-color: #163720 !important;
+}
+html.dark .text-emerald-700,
+html.dark .text-emerald-800,
+html.dark .text-emerald-900,
+html.dark .text-emerald-950 {
+  color: #91EAAF !important;
 }
 html.dark input,
 html.dark select,
 html.dark textarea {
-  background-color: #0f172a;
-  color: #f8fafc;
-  border-color: #334155;
+  background-color: #0E2316;
+  color: #F4FFFC;
+  border-color: #2A5B3A;
 }
 html.dark .hover\:bg-slate-50:hover,
 html.dark .hover\:bg-slate-100:hover {
-  background-color: #1e293b !important;
+  background-color: #1F4B2C !important;
 }
 
 /* Keep printable receipts high-contrast black-on-white */

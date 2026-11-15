@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Award, Calendar, CheckCircle2, CreditCard, Search } from 'lucide-react';
+import { Award, Calendar, CheckCircle2, Clock, CreditCard, Search } from 'lucide-react';
 import {
   AppSettings,
   Customer,
@@ -9,7 +9,12 @@ import {
   SaleLine,
   SaleRecord,
 } from '@shared/types';
-import { computePlanEndDate, formatPeso, isPlanActiveOnDate } from '@shared/billing';
+import {
+  computePlanEndDate,
+  formatPeso,
+  isPlanActiveOnDate,
+  isWithinOperatingHours,
+} from '@shared/billing';
 import { api } from '../api';
 import { PaymentModal } from '../components/PaymentModal';
 
@@ -19,6 +24,7 @@ interface PlansViewProps {
   planSubs: PlanSub[];
   staffName: string;
   onSaleCompleted: (sale: SaleRecord) => void;
+  onCheckedIn?: () => void;
 }
 
 export const PlansView: React.FC<PlansViewProps> = ({
@@ -27,8 +33,10 @@ export const PlansView: React.FC<PlansViewProps> = ({
   planSubs,
   staffName,
   onSaleCompleted,
+  onCheckedIn,
 }) => {
-  const [tab, setTab] = useState<'sell_plan' | 'sell_member' | 'directory'>('sell_plan');
+  const [tab, setTab] = useState<'sell' | 'directory'>('sell');
+  const [sellMode, setSellMode] = useState<'plan' | 'member'>('plan');
   const [customerName, setCustomerName] = useState('');
   const [memberCardNo, setMemberCardNo] = useState('');
   const [phone, setPhone] = useState('');
@@ -36,6 +44,8 @@ export const PlansView: React.FC<PlansViewProps> = ({
   const [selectedPlanType, setSelectedPlanType] = useState<'weekly' | 'semi_month' | 'monthly'>('weekly');
   const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [search, setSearch] = useState('');
+  const [checkingInId, setCheckingInId] = useState<string | null>(null);
+  const [directoryError, setDirectoryError] = useState<string>('');
   const [pendingCheckout, setPendingCheckout] = useState<{
     title: string;
     lines: SaleLine[];
@@ -126,65 +136,112 @@ export const PlansView: React.FC<PlansViewProps> = ({
   };
 
   const lifetimeMembers = customers.filter((c) => Boolean(c.isMember));
+  const withinHours = isWithinOperatingHours(new Date(), settings.openHour, settings.closeHour);
+
+  const handleQuickTimeInFromDirectory = async (opts: {
+    key: string;
+    customerId: number;
+    customerName: string;
+    isMember: boolean;
+    memberCardNo?: string | null;
+    planSubId?: number | null;
+  }) => {
+    setDirectoryError('');
+    setCheckingInId(opts.key);
+    try {
+      await api.timeIn({
+        customerId: opts.customerId,
+        customerName: opts.customerName,
+        isMember: opts.isMember,
+        memberCardNo: opts.memberCardNo || null,
+        planSubId: opts.planSubId || null,
+        notes: null,
+        allowOutsideHours: !withinHours ? true : true,
+      });
+      onCheckedIn?.();
+    } catch (err: any) {
+      setDirectoryError(err?.message || 'Could not start study session.');
+    } finally {
+      setCheckingInId(null);
+    }
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Clean Segmented Sub-navigation */}
-      <div className="flex justify-center">
-        <div className="inline-flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1">
+    <div className="space-y-5">
+      {/* Clean Centered 2-Tab Underline Navigation */}
+      <div className="border-b border-slate-200">
+        <div className="flex flex-wrap justify-center gap-6" role="tablist" aria-label="Plans and Membership">
           <button
             type="button"
-            onClick={() => setTab('sell_plan')}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold transition ${
-              tab === 'sell_plan'
-                ? 'bg-slate-900 text-white'
-                : 'text-slate-700 hover:bg-slate-100'
+            role="tab"
+            aria-selected={tab === 'sell'}
+            onClick={() => setTab('sell')}
+            className={`inline-flex items-center gap-1.5 border-b-2 pb-2.5 text-xs sm:text-sm font-bold transition ${
+              tab === 'sell'
+                ? 'border-blue-600 text-blue-700'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Calendar className="h-3.5 w-3.5" />
-            <span>Study Plans</span>
+            <Calendar className="h-4 w-4" />
+            <span>Enroll & Cards</span>
           </button>
 
           <button
             type="button"
-            onClick={() => setTab('sell_member')}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold transition ${
-              tab === 'sell_member'
-                ? 'bg-slate-900 text-white'
-                : 'text-slate-700 hover:bg-slate-100'
-            }`}
-          >
-            <Award className="h-3.5 w-3.5" />
-            <span>Membership Card</span>
-          </button>
-
-          <button
-            type="button"
+            role="tab"
+            aria-selected={tab === 'directory'}
             onClick={() => setTab('directory')}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold transition ${
+            className={`inline-flex items-center gap-1.5 border-b-2 pb-2.5 text-xs sm:text-sm font-bold transition tabular-nums ${
               tab === 'directory'
-                ? 'bg-slate-900 text-white'
-                : 'text-slate-700 hover:bg-slate-100'
+                ? 'border-blue-600 text-blue-700'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
             }`}
           >
-            <CreditCard className="h-3.5 w-3.5" />
+            <CreditCard className="h-4 w-4" />
             <span>Directory ({planSubs.length + lifetimeMembers.length})</span>
           </button>
         </div>
       </div>
 
-      {/* Tab 1: Sell Study Plan */}
-      {tab === 'sell_plan' && (
-        <form
-          onSubmit={handleStartPlanSale}
-          className="mx-auto max-w-lg space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_2px_8px_rgba(15,23,42,0.04)]"
-        >
-          <div>
-            <h2 className="text-xl font-bold tracking-tight text-slate-900">Enroll in Study Plan</h2>
-            <p className="mt-0.5 text-xs text-slate-600">
-              Consecutive days with ₱0 daily time charge during valid dates.
-            </p>
+      {/* Tab 1: Unified Enroll Plan / Sell Membership Card */}
+      {tab === 'sell' && (
+        <div className="mx-auto max-w-lg space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
+          {/* 1-Tap Switch: Study Plan vs Membership Card */}
+          <div className="grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+            <button
+              type="button"
+              onClick={() => setSellMode('plan')}
+              className={`inline-flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition ${
+                sellMode === 'plan'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Calendar className="h-3.5 w-3.5" />
+              <span>Study Plan</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSellMode('member')}
+              className={`inline-flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition ${
+                sellMode === 'member'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Award className="h-3.5 w-3.5" />
+              <span>Membership Card</span>
+            </button>
           </div>
+
+          {sellMode === 'plan' ? (
+            <form onSubmit={handleStartPlanSale} className="space-y-5">
+              <div>
+                <h2 className="text-xl font-bold tracking-tight text-slate-900">Enroll in Study Plan</h2>
+                <p className="mt-0.5 text-xs text-slate-600">
+                  Consecutive days with ₱0 daily time charge during valid dates.
+                </p>
+              </div>
 
           <div>
             <label htmlFor="plan-customer-name" className="block text-sm font-bold text-slate-800">
@@ -288,20 +345,14 @@ export const PlansView: React.FC<PlansViewProps> = ({
             Charge {formatPeso(planPrice)}
           </button>
         </form>
-      )}
-
-      {/* Tab 2: Sell Lifetime Membership Card */}
-      {tab === 'sell_member' && (
-        <form
-          onSubmit={handleStartMembershipSale}
-          className="mx-auto max-w-lg space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_2px_8px_rgba(15,23,42,0.04)]"
-        >
-          <div>
-            <h2 className="text-xl font-bold tracking-tight text-slate-900">Issue Membership Card</h2>
-            <p className="mt-0.5 text-xs text-slate-600">
-              One-time {formatPeso(settings.membershipCardPrice)} lifetime card unlocking member rates.
-            </p>
-          </div>
+          ) : (
+            <form onSubmit={handleStartMembershipSale} className="space-y-5">
+              <div>
+                <h2 className="text-xl font-bold tracking-tight text-slate-900">Issue Membership Card</h2>
+                <p className="mt-0.5 text-xs text-slate-600">
+                  One-time {formatPeso(settings.membershipCardPrice)} lifetime card unlocking member rates.
+                </p>
+              </div>
 
           <div>
             <label htmlFor="member-full-name" className="block text-sm font-bold text-slate-800">
@@ -351,14 +402,16 @@ export const PlansView: React.FC<PlansViewProps> = ({
 
           <button
             type="submit"
-            className="w-full rounded-xl bg-amber-600 py-3.5 text-sm font-bold text-white shadow-[0_2px_6px_rgba(217,119,6,0.25)] hover:bg-amber-700 tabular-nums"
+            className="w-full rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-[0_2px_6px_rgba(37,99,235,0.25)] hover:bg-blue-700 tabular-nums"
           >
             Activate Card ({formatPeso(settings.membershipCardPrice)})
           </button>
         </form>
+          )}
+        </div>
       )}
 
-      {/* Tab 3: Directory of Plans & Members */}
+      {/* Tab 2: Directory of Plans & Members (with 1-Tap Time In) */}
       {tab === 'directory' && (
         <div className="space-y-4">
           <div className="relative max-w-sm">
@@ -373,6 +426,12 @@ export const PlansView: React.FC<PlansViewProps> = ({
             />
           </div>
 
+          {directoryError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-900">
+              {directoryError}
+            </div>
+          )}
+
           <div className="grid gap-6 md:grid-cols-2">
             {/* Study Plan Subscriptions */}
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_2px_8px_rgba(15,23,42,0.04)]">
@@ -384,23 +443,45 @@ export const PlansView: React.FC<PlansViewProps> = ({
                   .filter((p) => p.customerName.toLowerCase().includes(search.toLowerCase()))
                   .map((p) => {
                     const active = isPlanActiveOnDate(p, todayYmd);
+                    const rowKey = `plan-${p.id}`;
                     return (
-                      <div key={p.id} className="flex items-center justify-between py-2.5 text-sm">
-                        <div>
-                          <div className="font-bold text-slate-900">{p.customerName}</div>
+                      <div key={p.id} className="flex items-center justify-between gap-2 py-2.5 text-sm">
+                        <div className="min-w-0">
+                          <div className="font-bold text-slate-900 truncate">{p.customerName}</div>
                           <div className="text-xs text-slate-600 tabular-nums">
                             {p.planType.replace('_', '-')} · {p.startDate} to {p.endDate}
                           </div>
                         </div>
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
-                            active
-                              ? 'bg-emerald-100 text-emerald-900'
-                              : 'bg-slate-100 text-slate-600'
-                          }`}
-                        >
-                          {active ? 'Active' : 'Expired'}
-                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span
+                            className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                              active
+                                ? 'bg-emerald-100 text-emerald-900'
+                                : 'bg-slate-100 text-slate-600'
+                            }`}
+                          >
+                            {active ? 'Active' : 'Expired'}
+                          </span>
+                          {active && onCheckedIn && (
+                            <button
+                              type="button"
+                              disabled={checkingInId === rowKey}
+                              onClick={() =>
+                                handleQuickTimeInFromDirectory({
+                                  key: rowKey,
+                                  customerId: p.customerId,
+                                  customerName: p.customerName,
+                                  isMember: Boolean(p.isMember),
+                                  planSubId: p.id,
+                                })
+                              }
+                              className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+                            >
+                              <Clock className="h-3 w-3" />
+                              <span>Time In</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -419,19 +500,47 @@ export const PlansView: React.FC<PlansViewProps> = ({
                       c.name.toLowerCase().includes(search.toLowerCase()) ||
                       (c.memberCardNo || '').toLowerCase().includes(search.toLowerCase())
                   )
-                  .map((c) => (
-                    <div key={c.id} className="flex items-center justify-between py-2.5 text-sm">
-                      <div>
-                        <div className="font-bold text-slate-900">{c.name}</div>
-                        <div className="text-xs text-slate-600 tabular-nums">
-                          {c.memberCardNo || 'No Card ID'} {c.phone ? `· ${c.phone}` : ''}
+                  .map((c) => {
+                    const rowKey = `member-${c.id}`;
+                    const activePlan = planSubs.find(
+                      (p) => p.customerId === c.id && isPlanActiveOnDate(p, todayYmd)
+                    );
+                    return (
+                      <div key={c.id} className="flex items-center justify-between gap-2 py-2.5 text-sm">
+                        <div className="min-w-0">
+                          <div className="font-bold text-slate-900 truncate">{c.name}</div>
+                          <div className="text-xs text-slate-600 tabular-nums">
+                            {c.memberCardNo || 'No Card ID'} {c.phone ? `· ${c.phone}` : ''}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-900">
+                            <CheckCircle2 className="h-3 w-3" /> Member
+                          </span>
+                          {onCheckedIn && (
+                            <button
+                              type="button"
+                              disabled={checkingInId === rowKey}
+                              onClick={() =>
+                                handleQuickTimeInFromDirectory({
+                                  key: rowKey,
+                                  customerId: c.id,
+                                  customerName: c.name,
+                                  isMember: true,
+                                  memberCardNo: c.memberCardNo,
+                                  planSubId: activePlan ? activePlan.id : null,
+                                })
+                              }
+                              className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+                            >
+                              <Clock className="h-3 w-3" />
+                              <span>Time In</span>
+                            </button>
+                          )}
                         </div>
                       </div>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-900">
-                        <CheckCircle2 className="h-3 w-3" /> Member
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
               </div>
             </div>
           </div>
